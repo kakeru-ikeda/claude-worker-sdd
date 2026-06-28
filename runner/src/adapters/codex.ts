@@ -9,8 +9,6 @@ export const codexAdapter: EngineAdapter = {
       "exec",
       "--sandbox",
       sandbox,
-      "--ask-for-approval",
-      "never",
       "--json",
       "-o",
       input.finalPath,
