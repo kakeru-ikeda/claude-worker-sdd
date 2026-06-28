@@ -7,7 +7,7 @@ For implementation tasks, use this flow:
 1. Clarify requirements and ask the user when intent or constraints are ambiguous.
 2. Use `/superpowers:writing-plans` to create design and implementation plan documents.
 3. Treat the Superpowers plan as the source of truth.
-4. Dispatch scoped implementation/review work through `worker-sdd` or `sdd-worker`.
+4. Dispatch scoped implementation work through `worker-sdd` or `sdd-worker`.
 5. Review reports, diffs, and acceptance results before moving to the next task.
 
 ## Worker Integration
@@ -18,7 +18,7 @@ Supported engine targets:
 
 | Engine | Status | Use |
 |---|---|---|
-| `codex` | primary | Default implementation, review, exploration, and fixes |
+| `codex` | primary | Default implementation, exploration, and fixes |
 | `opencode` | supported | Compatibility with the existing OpenCode SDD workflow |
 | `gemini` | future | Stub adapter, not implemented |
 
@@ -27,7 +27,7 @@ Supported engine targets:
 | Agent | When to use |
 |---|---|
 | `executor` | Implementation and bug fixes |
-| `reviewer` | Read-only task review and final branch review |
+| `reviewer` | Optional read-only second-opinion review |
 | `thinker` | Read-only design critique, alternative approaches, risk analysis |
 | `test-writer` | TDD red phase, test files only |
 | `operator` | Shell/Git operations only |
@@ -52,7 +52,6 @@ Read-only agents may run in parallel. Write-capable `executor` tasks run one at 
 The user can switch engines/models in natural language, for example:
 
 - `TASK-003だけOpenCodeに倒して`
-- `レビューだけCodex gpt-5.5で`
 - `軽い実装はgpt-5.4で`
 
 Reflect those choices in the task YAML. Priority:

@@ -5,14 +5,13 @@ description: Delegate a one-shot scoped task to a selected worker engine through
 
 # Ask Worker
 
-Use for a single scoped investigation, implementation, review, or shell/Git operation.
+Use for a single scoped investigation, implementation, or shell/Git operation.
 
 ## Usage
 
 ```text
 /ask-worker "implement the small fix from the current design"
 /ask-worker --agent explorer --engine codex "map auth-related files"
-/ask-worker --agent reviewer --engine opencode "review the current diff"
 ```
 
 ## Rules

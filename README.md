@@ -12,12 +12,12 @@ Claude Code
   -> docs/design/*.md + docs/plans/*.md
   -> sdd-runner
   -> engine adapter: codex | opencode | gemini future
-  -> task report/review YAML
+  -> task report YAML
   -> Claude review / next task
 ```
 
 Claude Code owns requirements, design, task orchestration, review decisions, and user-facing judgment.
-Worker engines execute scoped tasks only.
+Worker engines execute scoped tasks only. Claude Code performs the standard task review; worker review is optional second opinion only.
 
 ## Non-goals
 
@@ -40,7 +40,6 @@ Task artifacts are always isolated in per-task directories to avoid second-run c
       brief.md
       dispatch.yaml
       report.yaml
-      review.yaml
       status.yaml
       stdout.jsonl
       diff.patch

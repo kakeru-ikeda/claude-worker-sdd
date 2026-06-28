@@ -28,7 +28,7 @@ Optional overrides:
 4. Write `task.yaml` and `dispatch.yaml`.
 5. Dispatch the selected engine adapter.
 6. Require `report.yaml`.
-7. Generate review artifacts and `review.yaml`.
+7. Claude Code reviews the worker report, status, and diff. Optional: run `sdd-worker review` only for a second opinion.
 8. Update `progress.yaml`.
 
 Task artifacts must never be written directly into `.superpowers/sdd/`.
