@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["task_id", "agent", "status", "findings"],
+  "properties": {
+    "task_id": { "type": "string" },
+    "agent": { "type": "string" },
+    "status": { "enum": ["APPROVED", "NEEDS_FIXES"] },
+    "spec_compliance": { "type": "object" },
+    "findings": {
+      "type": "object",
+      "properties": {
+        "critical": { "type": "array" },
+        "important": { "type": "array" },
+        "minor": { "type": "array" }
+      },
+      "additionalProperties": true
+    },
+    "verdict": { "type": "object" }
+  },
+  "additionalProperties": true
+}
+

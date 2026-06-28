@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["id", "title", "agent", "engine", "acceptance"],
+  "properties": {
+    "id": { "type": "string" },
+    "title": { "type": "string" },
+    "source_plan": { "type": "string" },
+    "source_task_index": { "type": "integer" },
+    "agent": { "type": "string" },
+    "engine": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "enum": ["codex", "opencode", "gemini"] },
+        "runner": { "type": ["string", "null"] },
+        "model": { "type": ["string", "null"] },
+        "agent": { "type": ["string", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "worktree": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "base": { "type": ["string", "null"] },
+        "path": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "allow_files": { "type": "array", "items": { "type": "string" } },
+        "deny_files": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "acceptance": { "type": "array", "items": { "type": "string" } },
+    "verify": {
+      "type": "object",
+      "properties": {
+        "commands": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "constraints": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": true
+}
+

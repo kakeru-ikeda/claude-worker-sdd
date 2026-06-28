@@ -1,0 +1,15 @@
+name: gemini
+status: future
+default_runner: cli
+capabilities:
+  model_override: true
+  read_only_sandbox: false
+  workspace_write: false
+  json_output: false
+  file_attachments: false
+  resume: false
+command:
+  run: null
+notes:
+  - Stub only. Implement when Gemini CLI is selected for real use.
+

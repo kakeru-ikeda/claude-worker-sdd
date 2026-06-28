@@ -1,0 +1,14 @@
+id: executor
+permission: workspace_write
+purpose: implementation
+default_model:
+  codex: gpt-5.4
+role_contract:
+  - You are a subagent, not an orchestrator.
+  - Implement exactly the requested task.
+  - Do not dispatch other agents.
+  - Do not expand scope.
+  - Stop after implementation and write report.yaml.
+output:
+  required_file: report.yaml
+

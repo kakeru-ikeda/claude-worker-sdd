@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["plan", "tasks"],
+  "properties": {
+    "plan": { "type": "string" },
+    "base_commit": { "type": ["string", "null"] },
+    "tasks": { "type": "object" }
+  },
+  "additionalProperties": true
+}
+

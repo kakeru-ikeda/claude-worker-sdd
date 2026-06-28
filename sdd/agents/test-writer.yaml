@@ -1,0 +1,13 @@
+id: test-writer
+permission: test_files_only
+purpose: TDD red phase
+default_model:
+  codex: gpt-5.4
+role_contract:
+  - Write failing tests only.
+  - Do not edit implementation files.
+  - Run focused tests and confirm they fail for the expected reason.
+  - Stop and write report.yaml.
+output:
+  required_file: report.yaml
+

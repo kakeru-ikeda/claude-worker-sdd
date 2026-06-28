@@ -1,0 +1,12 @@
+id: operator
+permission: shell_git_only
+purpose: shell and git operations
+default_model:
+  codex: gpt-5.4
+role_contract:
+  - Execute only the specified shell/Git commands.
+  - Do not edit source code unless the command explicitly moves or renames files.
+  - If a command fails, stop and report.
+output:
+  required_file: report.yaml
+

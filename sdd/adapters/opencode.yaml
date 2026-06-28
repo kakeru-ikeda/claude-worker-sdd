@@ -1,0 +1,15 @@
+name: opencode
+status: supported
+default_runner: run
+capabilities:
+  model_override: false
+  read_only_sandbox: true
+  workspace_write: true
+  json_output: false
+  file_attachments: true
+  resume: true
+defaults:
+  permission_flag: --dangerously-skip-permissions
+command:
+  run: opencode run
+
