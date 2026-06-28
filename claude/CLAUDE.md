@@ -47,6 +47,16 @@ Use the Explorer to Thinker pipeline when design needs code context:
 
 Read-only agents may run in parallel. Write-capable `executor` tasks run one at a time unless `worktree.enabled: true`.
 
+## Non-Blocking Dispatch
+
+The worker runner spawns the engine (e.g. `codex exec`) and waits for it internally; a run can take many minutes. **Always dispatch the runner as a background shell job** (Bash `run_in_background: true`) — never in the foreground, or the orchestrator stalls and other work cannot proceed. This mirrors the predecessor, where the worker ran as a detached process and Claude Code only watched its artifacts.
+
+While a dispatch runs in the background:
+
+- The orchestrator stays free: answer the user, run read-only agents (`explorer` / `thinker` / `reviewer`) in parallel, and tail the engine stream to monitor.
+- Completion is observed from artifacts, not by blocking: `progress.yaml` flips `running` → `complete`/`failed`, and `tasks/task-N/status.yaml` carries the `exit_code`. The background job also re-invokes you on exit.
+- Still one `executor` at a time per worktree — background does not relax the single-writer rule.
+
 ## Engine Switching
 
 The user can switch engines/models in natural language, for example:
