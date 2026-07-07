@@ -1,11 +1,17 @@
 ---
 name: worker-sdd
-description: Run Superpowers SDD tasks through an engine-neutral worker runner. Supports Codex by default, OpenCode compatibility, and future engine adapters.
+description: Execute an approved Superpowers plan through external worker engines (Codex by default, OpenCode supported). Use whenever a plan document exists and implementation should start — this REPLACES superpowers:executing-plans and the git-worktree subagent flow for implementation.
 ---
 
 # Worker SDD
 
 Use this after `/superpowers:writing-plans` has produced a plan.
+
+**This skill replaces `superpowers:executing-plans`.** Never implement plan tasks
+with general-purpose subagents, `superpowers:using-git-worktrees`, or
+`superpowers:finishing-a-development-branch` — implementation is dispatched to
+worker engines through the runner below, and the orchestrator only reviews and
+commits.
 
 ## Usage
 

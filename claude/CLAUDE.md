@@ -34,6 +34,25 @@ Design pipeline: worker `explorer` maps the code → `planner` subagent drafts t
 plans = planner (Layer 1). Critique and code reading = workers (Layer 2). Final
 decisions never leave Claude Code.
 
+## Superpowers boundary — explicit user override
+
+Superpowers skills are for **requirements and planning only**. Per
+superpowers:using-superpowers, user instructions take precedence over skill
+workflows — this section is that explicit instruction:
+
+- ALLOWED: `superpowers:brainstorming` (requirements intake with the user),
+  `superpowers:writing-plans` (plan documents).
+- FORBIDDEN once a plan exists: `superpowers:executing-plans`,
+  `superpowers:using-git-worktrees`, `superpowers:finishing-a-development-branch`,
+  and spawning general-purpose or implementation subagents to write code.
+  Implementation goes through worker-sdd ONLY:
+  `sdd-worker next <plan.md> --verify '<cmd>'` (background).
+- During brainstorming, do not `cat` whole files into your own context — delegate
+  code investigation to a worker `explorer` (or the Explore subagent for a one-off
+  question) and read its summary.
+- After brainstorming, non-trivial design/plan drafting is delegated to the
+  `planner` subagent — do not write the design inline in the conversation.
+
 ## Iron rules
 
 1. Dispatch `sdd-worker run|next|one-shot` **in the background**
