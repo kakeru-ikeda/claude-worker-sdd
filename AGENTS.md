@@ -28,6 +28,16 @@ for skill in skills/*/; do
 done
 ```
 
+### Step 1b: Install subagents (optional, recommended)
+
+```bash
+mkdir -p ~/.claude/agents
+cp claude/agents/planner.md ~/.claude/agents/planner.md
+```
+
+`planner` runs on an Opus-class model and drafts worker-ready plan documents
+(per-task file lists, acceptance criteria, verify commands).
+
 ### Step 2: Install or merge Claude guidance
 
 Do not overwrite an existing `~/.claude/CLAUDE.md` automatically. If missing, copy it. If present, merge the sections manually.
@@ -41,12 +51,13 @@ else
 fi
 ```
 
-### Step 3: Install runner dependencies
+### Step 3: Install runner dependencies and expose the CLI
 
 ```bash
 cd runner
 npm install
 npm run build
+npm link          # puts `sdd-worker` on PATH — skills and CLAUDE.md reference it by name
 ```
 
 ### Step 4: Reload Claude skills

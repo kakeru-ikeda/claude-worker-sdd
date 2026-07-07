@@ -1,72 +1,65 @@
 # Claude Code SDD Configuration
 
-## Development Workflow
+Claude Code is the orchestrator: it owns requirements, plans, diff review, commits,
+and user-facing decisions. Implementation work is dispatched to external worker
+engines via the `sdd-worker` CLI (installed on PATH by `npm link`; see the
+claude-worker-sdd repo's AGENTS.md). The runner enforces the mechanics — per-plan
+state, task numbering, locking, verify gates — and **prints the next action after
+every run: follow those printed hints.** Details are retrieved on demand with
+`sdd-worker guide <topic>` (run `sdd-worker guide` to list topics); never load the
+whole playbook into context.
 
-For implementation tasks, use this flow:
+## Two delegation layers — do not confuse them
 
-1. Clarify requirements and ask the user when intent or constraints are ambiguous.
-2. Use `/superpowers:writing-plans` to create design and implementation plan documents.
-3. Treat the Superpowers plan as the source of truth.
-4. Dispatch scoped implementation work through `worker-sdd` or `sdd-worker`.
-5. Review reports, diffs, and acceptance results before moving to the next task.
+**Layer 1: Claude Code subagents** (native Agent tool, Claude models, spends your
+context budget):
 
-## Worker Integration
+- `planner` — drafts plan documents on an Opus-class model. Use for any non-trivial
+  design. It starts with zero conversation context: always pass it the explorer
+  findings and the user's requirements explicitly.
+- Built-in read-only agents (Explore) — one-off codebase questions only.
 
-Claude Code is the orchestrator. Worker engines are subagents.
+**Layer 2: worker roles** (external engines via `sdd-worker`, separate token budget,
+prefer for anything scoped):
 
-Supported engine targets:
+- `executor` — implementation and fixes
+- `explorer` — read-only code investigation (default choice for mapping code)
+- `thinker` — read-only critique of an existing design or plan
+- `reviewer` — optional second-opinion diff review (rarely needed)
+- `test-writer` — TDD red phase, test files only
+- `operator` — shell/Git operations
 
-| Engine | Status | Use |
-|---|---|---|
-| `codex` | primary | Default implementation, exploration, and fixes |
-| `opencode` | supported | Compatibility with the existing OpenCode SDD workflow |
-| `gemini` | future | Stub adapter, not implemented |
+Design pipeline: worker `explorer` maps the code → `planner` subagent drafts the plan
+→ optionally worker `thinker` critiques the draft → the user approves. Authoring
+plans = planner (Layer 1). Critique and code reading = workers (Layer 2). Final
+decisions never leave Claude Code.
 
-## Agent Roster
+## Iron rules
 
-| Agent | When to use |
-|---|---|
-| `executor` | Implementation and bug fixes |
-| `reviewer` | Optional read-only second-opinion review |
-| `thinker` | Read-only design critique, alternative approaches, risk analysis |
-| `test-writer` | TDD red phase, test files only |
-| `operator` | Shell/Git operations only |
-| `explorer` | Read-only code investigation and structure mapping |
+1. Dispatch `sdd-worker run|next|one-shot` **in the background**
+   (`run_in_background: true`). A lock-refusal error means wait, not retry.
+2. First dispatch of a plan: set `--verify '<test command>'`. Completion is gated on
+   it for every task.
+3. Engines cannot write `.git`: the orchestrator commits — one commit per accepted
+   task, before the next dispatch.
+4. After a run, read only `status.yaml` → `report.yaml` → `diff.patch`. Never a full
+   `stdout.jsonl` (tail ≤ 50 lines, and only when triaging a failure).
+5. Max 2 retries per task, and never retry without changing something (constraints,
+   model, or engine).
+6. Direct-edit exception: ≤ 2 files, ≤ ~30 lines, exactly specifiable without
+   exploration → edit it yourself, run verify, commit. Everything larger goes
+   through a worker.
+7. Never preflight engines (`which codex`, `codex --version`, …) before a dispatch —
+   dispatch directly. A missing binary fails in under a second with a
+   "binary not found" reason and a hint. `sdd-worker doctor` exists for setup
+   debugging only, not as a per-session ritual.
 
-Design, planning, and final decisions stay with Claude Code.
+## Engine switching
 
-## Delegation Rules
-
-Code investigation should normally be delegated to `explorer` so Claude Code preserves context for orchestration. Minimal direct checks are acceptable when validating worker output or when the user explicitly asks Claude Code to inspect something directly.
-
-Use the Explorer to Thinker pipeline when design needs code context:
-
-1. Ask `explorer` to map the relevant code.
-2. Pass the findings to `thinker`.
-3. Use Thinker's analysis to finalize the Superpowers plan.
-
-Read-only agents may run in parallel. Write-capable `executor` tasks run one at a time unless `worktree.enabled: true`.
-
-## Non-Blocking Dispatch
-
-The worker runner spawns the engine (e.g. `codex exec`) and waits for it internally; a run can take many minutes. **Always dispatch the runner as a background shell job** (Bash `run_in_background: true`) — never in the foreground, or the orchestrator stalls and other work cannot proceed. This mirrors the predecessor, where the worker ran as a detached process and Claude Code only watched its artifacts.
-
-While a dispatch runs in the background:
-
-- The orchestrator stays free: answer the user, run read-only agents (`explorer` / `thinker` / `reviewer`) in parallel, and tail the engine stream to monitor.
-- Completion is observed from artifacts, not by blocking: `progress.yaml` flips `running` → `complete`/`failed`, and `tasks/task-N/status.yaml` carries the `exit_code`. The background job also re-invokes you on exit.
-- Still one `executor` at a time per worktree — background does not relax the single-writer rule.
-
-## Engine Switching
-
-The user can switch engines/models in natural language, for example:
-
-- `TASK-003だけOpenCodeに倒して`
-- `軽い実装はgpt-5.4で`
-
-Reflect those choices in the task YAML. Priority:
+The user can switch engines/models in natural language
+(`TASK-003だけOpenCodeに倒して`, `軽い実装はgpt-5.4で`) — apply with
+`sdd-worker set TASK-N engine|model <value>`. Priority:
 
 ```text
 CLI override > task.yaml > progress.yaml attempt record > project defaults > adapter defaults
 ```
-
