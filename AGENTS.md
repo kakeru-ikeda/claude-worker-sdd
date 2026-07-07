@@ -38,6 +38,33 @@ cp claude/agents/planner.md ~/.claude/agents/planner.md
 `planner` runs on an Opus-class model and drafts worker-ready plan documents
 (per-task file lists, acceptance criteria, verify commands).
 
+### Step 1c: Install hooks (required when the Superpowers plugin is enabled)
+
+Static CLAUDE.md prose loses to Superpowers' hook-injected skill chain on weaker
+models; these hooks fight at the same layer. `sdd-boundary.md` is injected as
+context at every session start, and the PreToolUse script mechanically blocks
+`superpowers:executing-plans` / `using-git-worktrees` /
+`finishing-a-development-branch` so implementation can only go through worker-sdd.
+
+```bash
+mkdir -p ~/.claude/hooks
+cp claude/hooks/sdd-boundary.md claude/hooks/deny-superpowers-exec.sh ~/.claude/hooks/
+chmod +x ~/.claude/hooks/deny-superpowers-exec.sh
+```
+
+Then merge into `~/.claude/settings.json`:
+
+```json
+"hooks": {
+  "SessionStart": [
+    { "hooks": [ { "type": "command", "command": "cat \"$HOME/.claude/hooks/sdd-boundary.md\"" } ] }
+  ],
+  "PreToolUse": [
+    { "matcher": "Skill", "hooks": [ { "type": "command", "command": "\"$HOME/.claude/hooks/deny-superpowers-exec.sh\"" } ] }
+  ]
+}
+```
+
 ### Step 2: Install or merge Claude guidance
 
 Do not overwrite an existing `~/.claude/CLAUDE.md` automatically. If missing, copy it. If present, merge the sections manually.
