@@ -26,6 +26,41 @@ export function runCommand(
       out?.end();
       resolve(code ?? 1);
     });
+    child.on("error", () => {
+      out?.end();
+      resolve(127);
+    });
+  });
+}
+
+export function runShell(
+  command: string,
+  opts: { cwd: string; logPath?: string },
+): Promise<number> {
+  return runCommand("bash", ["-lc", command], {
+    cwd: opts.cwd,
+    stdoutPath: opts.logPath,
+    stderrToStdout: true,
+  });
+}
+
+export function captureCommand(
+  command: string,
+  args: string[],
+  opts: { cwd: string },
+): Promise<{ code: number; stdout: string }> {
+  return new Promise((resolve) => {
+    const child = spawn(command, args, {
+      cwd: opts.cwd,
+      shell: false,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    let buf = "";
+    child.stdout.on("data", (chunk) => {
+      buf += chunk;
+    });
+    child.on("close", (code) => resolve({ code: code ?? 1, stdout: buf }));
+    child.on("error", () => resolve({ code: 127, stdout: "" }));
   });
 }
 

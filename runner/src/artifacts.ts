@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { rename, rm } from "node:fs/promises";
+import { basename, join, relative, resolve } from "node:path";
 import type { AgentName, EngineName, Progress, TaskSpec } from "./types.js";
 import { ensureDir, readYaml, writeText, writeYaml } from "./fsutil.js";
 import { defaultTitle, taskDirName, taskId, writeBrief } from "./superpowers.js";
@@ -10,30 +11,152 @@ export function sddRoot(workspace: string): string {
   return join(workspace, ".superpowers", "sdd");
 }
 
-export function progressPath(workspace: string): string {
-  return join(sddRoot(workspace), "progress.yaml");
+export function planSlug(planPath: string): string {
+  const base = basename(planPath).replace(/\.md$/i, "");
+  const slug = base.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  return slug || "plan";
 }
 
-export async function loadProgress(workspace: string, planPath: string): Promise<Progress> {
-  const path = progressPath(workspace);
-  if (existsSync(path)) return readYaml<Progress>(path);
-  return { plan: planPath, base_commit: null, tasks: {} };
+export function planRoot(workspace: string, slug: string): string {
+  return join(sddRoot(workspace), "plans", slug);
 }
 
-export async function saveProgress(workspace: string, progress: Progress): Promise<void> {
-  await writeYaml(progressPath(workspace), progress);
+export function progressPath(workspace: string, slug: string): string {
+  return join(planRoot(workspace, slug), "progress.yaml");
+}
+
+export function normalizePlanPath(workspace: string, planPath: string): string {
+  return relative(workspace, resolve(workspace, planPath)) || planPath;
+}
+
+export function currentPlanPointerPath(workspace: string): string {
+  return join(sddRoot(workspace), "current-plan.yaml");
+}
+
+export async function saveCurrentPlan(workspace: string, plan: string, slug: string): Promise<void> {
+  await writeYaml(currentPlanPointerPath(workspace), { plan, slug });
+}
+
+export async function loadCurrentPlan(
+  workspace: string,
+): Promise<{ plan: string; slug: string } | null> {
+  const path = currentPlanPointerPath(workspace);
+  if (!existsSync(path)) return null;
+  return readYaml<{ plan: string; slug: string }>(path);
+}
+
+// Pre-plans layout kept progress.yaml and tasks/ directly under .superpowers/sdd/,
+// so a second plan silently inherited the first plan's completed tasks. Move any
+// legacy state into plans/<slug>/ before touching progress.
+export async function migrateLegacyLayout(workspace: string): Promise<string | null> {
+  const legacyProgressPath = join(sddRoot(workspace), "progress.yaml");
+  if (!existsSync(legacyProgressPath)) return null;
+
+  const legacy = await readYaml<Progress>(legacyProgressPath);
+  const slug = planSlug(legacy.plan || "legacy");
+  let dest = planRoot(workspace, slug);
+  if (existsSync(dest)) {
+    dest = `${dest}-legacy-${new Date().toISOString().replace(/[:.]/g, "-")}`;
+  }
+  await ensureDir(dest);
+
+  const destTasksRel = relative(workspace, join(dest, "tasks"));
+  for (const item of Object.values(legacy.tasks ?? {})) {
+    if (item.path) {
+      item.path = item.path.replace(/^\.superpowers\/sdd\/tasks\//, `${destTasksRel}/`);
+    }
+  }
+  await writeYaml(join(dest, "progress.yaml"), legacy);
+  await rm(legacyProgressPath);
+
+  const legacyTasks = join(sddRoot(workspace), "tasks");
+  if (existsSync(legacyTasks)) await rename(legacyTasks, join(dest, "tasks"));
+  return dest;
+}
+
+// Load (or initialize) the per-plan progress state. If the slug directory holds
+// progress for a *different* plan file with the same basename, archive it and
+// start fresh instead of inheriting its tasks.
+export async function ensurePlanState(
+  workspace: string,
+  planPath: string,
+): Promise<{ slug: string; progress: Progress }> {
+  await migrateLegacyLayout(workspace);
+  const slug = planSlug(planPath);
+  const path = progressPath(workspace, slug);
+  if (existsSync(path)) {
+    const existing = await readYaml<Progress>(path);
+    if (normalizePlanPath(workspace, existing.plan ?? "") === planPath) {
+      return { slug, progress: existing };
+    }
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    await rename(planRoot(workspace, slug), `${planRoot(workspace, slug)}-archived-${stamp}`);
+  }
+  return { slug, progress: { plan: planPath, base_commit: null, tasks: {} } };
+}
+
+export function lockPath(workspace: string, slug: string): string {
+  return join(planRoot(workspace, slug), ".lock");
+}
+
+// Enforces the single-writer rule at the script level: one executor run per plan.
+// A lock whose pid is no longer alive is treated as stale and replaced.
+export async function acquireLock(workspace: string, slug: string, taskIdValue: string): Promise<void> {
+  const path = lockPath(workspace, slug);
+  if (existsSync(path)) {
+    const lock = await readYaml<{ pid?: number; task_id?: string; started_at?: string }>(path);
+    let alive = false;
+    if (lock?.pid) {
+      try {
+        process.kill(lock.pid, 0);
+        alive = true;
+      } catch (error: unknown) {
+        // EPERM = the process exists but belongs to another user: still alive.
+        alive = (error as NodeJS.ErrnoException).code === "EPERM";
+      }
+    }
+    if (alive) {
+      throw new Error(
+        `another run is active for this plan (${lock.task_id ?? "?"}, pid ${lock.pid}, since ${lock.started_at ?? "?"}). ` +
+          `Wait for it to finish, or delete ${path} if it is stale.`,
+      );
+    }
+  }
+  await writeYaml(path, { pid: process.pid, task_id: taskIdValue, started_at: new Date().toISOString() });
+}
+
+export async function releaseLock(workspace: string, slug: string): Promise<void> {
+  await rm(lockPath(workspace, slug), { force: true });
+}
+
+export async function loadProgressFor(workspace: string, slug: string): Promise<Progress> {
+  const path = progressPath(workspace, slug);
+  if (!existsSync(path)) {
+    throw new Error(`No progress found for plan slug "${slug}" (${path})`);
+  }
+  return readYaml<Progress>(path);
+}
+
+export async function saveProgress(
+  workspace: string,
+  slug: string,
+  progress: Progress,
+): Promise<void> {
+  await writeYaml(progressPath(workspace, slug), progress);
 }
 
 export async function prepareTask(input: {
   workspace: string;
   planPath: string;
+  slug: string;
   index: number;
   engine?: EngineName;
   model?: string;
   agent?: AgentName;
+  verifyCommand?: string;
 }): Promise<{ task: TaskSpec; taskDir: string; dispatchPath: string }> {
   const id = taskId(input.index);
-  const dir = join(sddRoot(input.workspace), "tasks", taskDirName(input.index));
+  const dir = join(planRoot(input.workspace, input.slug), "tasks", taskDirName(input.index));
   await ensureDir(dir);
 
   const briefPath = join(dir, "brief.md");
@@ -57,6 +180,7 @@ export async function prepareTask(input: {
       agent: input.engine === "opencode" ? input.agent ?? "executor" : null,
     },
     worktree: { enabled: false, base: null, path: null },
+    ...(input.verifyCommand ? { verify: { commands: [input.verifyCommand] } } : {}),
     acceptance: ["Complete the scoped task brief", "Write the required YAML report"],
     constraints: [
       "Implement only this task",

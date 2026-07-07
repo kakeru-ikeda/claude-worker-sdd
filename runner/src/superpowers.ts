@@ -73,3 +73,15 @@ export function defaultTitle(planPath: string, index: number): string {
   return `${basename(planPath, ".md")} task ${index}`;
 }
 
+// Highest task number declared in the plan ("### Task 3: ..." or "TASK-003"
+// headings), or null when the plan has no recognizable task headings.
+export function countPlanTasks(planText: string): number | null {
+  let max = 0;
+  const headingRe = /^#{1,4}\s*(?:Task\s+(\d+)\b|TASK-(\d+)\b)/gim;
+  for (const match of planText.matchAll(headingRe)) {
+    const n = Number(match[1] ?? match[2]);
+    if (Number.isFinite(n) && n > max) max = n;
+  }
+  return max > 0 ? max : null;
+}
+
