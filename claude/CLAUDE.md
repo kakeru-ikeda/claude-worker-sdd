@@ -14,9 +14,10 @@ whole playbook into context.
 **Layer 1: Claude Code subagents** (native Agent tool, Claude models, spends your
 context budget):
 
-- `planner` — drafts plan documents on an Opus-class model. Use for any non-trivial
-  design. It starts with zero conversation context: always pass it the explorer
-  findings and the user's requirements explicitly.
+- `planner` — writes plan documents to disk on an Opus-class model and returns only
+  the file path + task list. Use for any non-trivial design. It starts with zero
+  conversation context: always pass it the explorer findings and the user's
+  requirements explicitly. Never author or transcribe the plan yourself.
 - Built-in read-only agents (Explore) — one-off codebase questions only.
 
 **Layer 2: worker roles** (external engines via `sdd-worker`, separate token budget,

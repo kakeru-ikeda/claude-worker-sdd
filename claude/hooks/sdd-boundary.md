@@ -6,9 +6,11 @@ precedence over skill workflows (superpowers:using-superpowers honors this).
    cat/Read whole source files into your own context while brainstorming —
    dispatch Agent(Explore) or `sdd-worker one-shot "..." --agent explorer`
    and read the returned summary instead.
-2. Design documents and plans are DRAFTED by the `planner` subagent (Agent
-   tool, Opus-class). Feed it the explorer summary and the user's answers.
-   Do not write the design or plan inline in the conversation.
+2. Design documents and plans are WRITTEN TO DISK by the `planner` subagent
+   (Agent tool, Opus-class) — it saves docs/plans/<date>-<slug>.md itself and
+   returns only the path + task list. Feed it the explorer summary and the
+   user's answers. Never write the design/plan yourself, inline or as a file;
+   review the returned task list with the user, then dispatch.
 3. Once a plan document exists, implementation goes through the `worker-sdd`
    skill ONLY: `sdd-worker next <plan.md> --verify '<test cmd>'` as a
    background job. `superpowers:executing-plans`,
