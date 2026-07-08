@@ -4,14 +4,17 @@ This repository installs a Superpowers-centered SDD workflow that can dispatch t
 
 ## What This Repo Provides
 
-- `claude/CLAUDE.md` - Claude Code orchestration guidance.
+- `claude/CLAUDE.md` - Claude Code orchestration guidance (two-layer delegation, iron rules).
+- `claude/agents/planner.md` - Opus-class plan-drafting subagent definition.
+- `claude/hooks/` - SessionStart boundary injection + PreToolUse block of Superpowers' execution chain.
 - `skills/ask-worker/SKILL.md` - one-shot worker delegation.
-- `skills/worker-sdd/SKILL.md` - Superpowers SDD loop backed by `sdd-runner`.
-- `skills/sdd-worker/SKILL.md` - engine-neutral worker commands.
+- `skills/worker-sdd/SKILL.md` - Superpowers SDD loop backed by the runner.
+- `skills/sdd-worker/SKILL.md` - engine-neutral worker control commands.
 - `sdd/agents/*.yaml` - engine-independent agent role contracts.
 - `sdd/adapters/*.yaml` - engine capabilities and command templates.
-- `sdd/schemas/*.schema.json` - YAML/JSON contract schemas.
-- `runner/` - TypeScript runner.
+- `sdd/schemas/*.schema.json` - YAML/JSON contract schemas (resolved from the runner install).
+- `runner/` - TypeScript runner (`sdd-worker` CLI via `npm link`).
+- `docs/ORCHESTRATION.md` - orchestration playbook, retrieved per-section via `sdd-worker guide`.
 
 ## Setup Instructions
 

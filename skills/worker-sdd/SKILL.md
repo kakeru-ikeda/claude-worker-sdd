@@ -55,19 +55,22 @@ progress updates, diff capture, report validation, single-run lock):
    `--net` to that one dispatch; FS/.git protection stays on.
 2. Dispatch **in the background** (see below): prefer `next <plan.md>` — it picks the
    first non-complete task; use `run <plan.md> --task TASK-N` only to override.
-2. While it runs, keep orchestrating. Do not poll in a loop; the background job
+3. While it runs, keep orchestrating. Do not poll in a loop; the background job
    re-invokes you on exit.
-3. On completion read, in order: `status.yaml` (verdict + `failure_reason`),
+4. On completion read, in order: `status.yaml` (verdict + `failure_reason`),
    `report.yaml`, `diff.patch`. Nothing else unless triaging (then
-   `tail -n 50` of the latest `attempts/*/stdout.jsonl`).
-4. Review the diff against the plan's acceptance criteria yourself. Optional:
+   `tail -n 50` of the latest `attempts/*/stdout.jsonl` or `verify.log`).
+5. Review the diff against the plan's acceptance criteria yourself. Optional:
    `sdd-worker review` for a second opinion on risky changes only.
-5. Accept → the orchestrator commits (engine sandboxes cannot write `.git`), one
+6. Accept → the orchestrator commits (engine sandboxes cannot write `.git`), one
    commit per task, including `untracked_files` listed in status.yaml. Then loop.
-6. Fail → the runner already printed the class-specific hint; follow it
+   If a task failed only on report formality but the diff is right and verify
+   passed, `sdd-worker accept TASK-N --note "..."` instead of re-running.
+7. Fail → the runner already printed the class-specific hint; follow it
    (deeper: `sdd-worker guide triage`). Max 2 retries per task, and never retry
-   without changing something (constraints, model, or engine).
-7. Stop when `next` prints "all N tasks complete"; run the plan's final verification
+   without changing something (constraints, model, or engine). Accept or retry —
+   never both.
+8. Stop when `next` prints "all N tasks complete"; run the plan's final verification
    (tests + build) once, directly.
 
 Task artifacts must never be written directly into `.superpowers/sdd/`. The runner
@@ -96,8 +99,8 @@ The runner records progress before and after the engine runs, so completion is o
 from artifacts (paths relative to the repo root; `<plan>` = `plans/<plan-slug>/`,
 `task-N` = `tasks/task-<index>/`):
 
-- `.superpowers/sdd/<plan>/progress.yaml` — task flips `status: running` → `complete` | `failed` (`complete` requires exit 0 **and** a report claiming DONE)
-- `.superpowers/sdd/<plan>/tasks/task-N/status.yaml` — verdict, `exit_code`, `report_status`, `failure_reason`, `untracked_files`
+- `.superpowers/sdd/<plan>/progress.yaml` — task flips `status: running` → `complete` | `failed` (`complete` = engine exit 0 + report DONE-equivalent + verify command pass)
+- `.superpowers/sdd/<plan>/tasks/task-N/status.yaml` — verdict, `exit_code`, `report_status` (normalized), `verify_exit`, `failure_reason`, `untracked_files`
 - `.superpowers/sdd/<plan>/tasks/task-N/diff.patch` — auto-captured worktree diff vs HEAD; review this, not the files
 - `.superpowers/sdd/<plan>/tasks/task-N/report.yaml` — the worker's report (required output)
 - `.superpowers/sdd/<plan>/tasks/task-N/attempts/<NNN-engine-model>/stdout.jsonl` — live engine stream (tail sparingly; can be huge)

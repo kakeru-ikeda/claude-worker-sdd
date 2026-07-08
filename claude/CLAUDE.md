@@ -65,7 +65,8 @@ workflows — this section is that explicit instruction:
 4. After a run, read only `status.yaml` → `report.yaml` → `diff.patch`. Never a full
    `stdout.jsonl` (tail ≤ 50 lines, and only when triaging a failure).
 5. Max 2 retries per task, and never retry without changing something (constraints,
-   model, or engine).
+   model, or engine). If the diff is right and verify passed but the report tripped,
+   `sdd-worker accept TASK-N --note "..."` — accept or retry, never both.
 6. Direct-edit exception: ≤ 2 files, ≤ ~30 lines, exactly specifiable without
    exploration → edit it yourself, run verify, commit. Everything larger goes
    through a worker.

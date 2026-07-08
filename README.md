@@ -46,12 +46,16 @@ isolated in per-task directories.
           task.yaml
           brief.md
           dispatch.yaml
-          report.yaml
-          status.yaml
-          stdout.jsonl
-          diff.patch
+          report.yaml            # worker's report (status normalized by the runner)
+          status.yaml            # verdict: exit_code, report_status, verify_exit, failure_reason
+          diff.patch             # auto-captured worktree diff vs HEAD (pre-verify)
           attempts/
             001-codex-gpt-5.4/
+              stdout.jsonl       # live engine stream
+              final.md
+              verify.log         # output of the --verify command
+              diff.patch
+              status.yaml
 ```
 
 The runner migrates any legacy flat layout (`.superpowers/sdd/progress.yaml` +
@@ -92,16 +96,24 @@ The TypeScript runner lives in `runner/`.
 cd runner
 npm install
 npm run build
-node dist/index.js next docs/plans/example.md     # dispatch first non-complete task
-node dist/index.js run docs/plans/example.md --task TASK-002
-node dist/index.js one-shot "map auth files" --agent explorer
-node dist/index.js status
+npm link            # puts `sdd-worker` on PATH
+
+sdd-worker next docs/plans/example.md --verify '<project test cmd>'   # first dispatch sets the gate
+sdd-worker next docs/plans/example.md          # dispatch first non-complete task
+sdd-worker run docs/plans/example.md --task TASK-002 [--net]
+sdd-worker one-shot "map auth files" --agent explorer
+sdd-worker status | retry TASK-002 | accept TASK-002 --note "..." | review TASK-002
+sdd-worker guide [<topic>]                     # print one playbook section on demand
+sdd-worker doctor                              # engine CLI setup check
 ```
 
 The runner enforces the operational contract so the orchestrator does not have to:
 per-plan state isolation, task-count validation against the plan, a single-run lock,
-report validation (`complete` = exit 0 + report DONE), and automatic `diff.patch` /
-`base_commit` capture. Orchestration rules live in `docs/ORCHESTRATION.md`.
+completion gating (`complete` = engine exit 0 + report DONE-equivalent + `--verify`
+command pass; report statuses are normalized and survive broken YAML), automatic
+`diff.patch` / `base_commit` capture, per-dispatch `--net` opt-in (outbound network
+only; FS/`.git` protection always on), and just-in-time next-action hints after every
+run. Orchestration rules live in `docs/ORCHESTRATION.md` (`sdd-worker guide`).
 
 The runner defaults to direct checkout writes. Use `worktree.enabled: true` in a task/default config when parallel write execution is needed.
 
