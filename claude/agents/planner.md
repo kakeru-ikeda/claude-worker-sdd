@@ -42,6 +42,10 @@ Rules:
   exact file paths, function signatures, expected behavior. Vague tasks are rejected.
 - Size tasks so one engine run completes one task (roughly ≤ 300 changed lines).
 - Order tasks so each leaves the repo green (tests pass after every task).
+- Task steps must NOT include git commit/push — workers cannot write .git; the
+  orchestrator commits after reviewing each task. Do not include "start the dev
+  server and check visually" steps either; put browser checks in the verify
+  command or leave them to the orchestrator.
 - State one shared verify command for the plan (used as `--verify`), plus per-task
   additions only when needed.
 - If requirements are ambiguous, list the open questions at the top of the plan

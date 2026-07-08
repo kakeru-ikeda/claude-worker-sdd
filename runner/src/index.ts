@@ -387,13 +387,20 @@ async function run(argv: string[]): Promise<number> {
       // valid report claiming DONE. Anything else needs orchestrator attention.
       const reportFile = join(taskDir, "report.yaml");
       let reportStatus: string | null = null;
+      let reportParseError = false;
       const reportPresent = existsSync(reportFile);
       if (reportPresent) {
         try {
           const report = await readYaml<{ status?: string }>(reportFile);
           reportStatus = report?.status ?? null;
         } catch {
-          reportStatus = "INVALID_YAML";
+          // Engines write markdown-flavored prose; a scalar starting with a
+          // backtick is invalid YAML and kills strict parsing. The gate only
+          // needs the status field — extract it line-wise instead of failing.
+          reportParseError = true;
+          const text = await readText(reportFile);
+          const match = text.match(/^status:\s*["']?([A-Za-z_][A-Za-z_ -]*?)["']?\s*$/m);
+          reportStatus = match ? match[1] : "INVALID_YAML";
         }
       }
       const engineOk = result.exitCode === 0;
@@ -456,6 +463,7 @@ async function run(argv: string[]): Promise<number> {
         report_present: reportPresent,
         report_status: reportNorm,
         report_status_raw: reportStatus,
+        report_parse_error: reportParseError,
         verify_command: verifyCommand ?? null,
         verify_exit: verifyExit,
         failure_reason: failureReason,

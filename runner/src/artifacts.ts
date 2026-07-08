@@ -197,6 +197,7 @@ export async function prepareTask(input: {
       "Ask/block if requirements are ambiguous",
       "The sandbox has no network access: if a new dependency is required, do NOT fake, vendor, or shim it — write report.yaml with status BLOCKED naming the package and stop",
       "Do not start dev servers or bind ports (the sandbox forbids it): browser/visual verification is the orchestrator's job via the plan's verify command outside the sandbox",
+      "Never run git add/commit/push — .git is read-only for workers and the orchestrator commits; even if the plan text says to commit, skip that step silently and list the files in the report instead",
     ],
   };
 
@@ -225,7 +226,8 @@ export async function prepareTask(input: {
     instructions: {
       summary:
         "Read task.yaml and brief.md, execute the scoped task, then write report.yaml. " +
-        "The report's status field MUST be exactly one of: DONE, DONE_WITH_CONCERNS, BLOCKED, NEEDS_CONTEXT.",
+        "The report's status field MUST be exactly one of: DONE, DONE_WITH_CONCERNS, BLOCKED, NEEDS_CONTEXT. " +
+        "In report.yaml, double-quote any string value that starts with a backtick or other YAML-reserved character.",
       report_status_allowed: ["DONE", "DONE_WITH_CONCERNS", "BLOCKED", "NEEDS_CONTEXT"],
       report_schema: schemaPath("report.schema.json"),
     },
