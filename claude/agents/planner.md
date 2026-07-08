@@ -51,7 +51,9 @@ Rules:
   dependencies in the "New dependencies" line (the orchestrator installs them
   before dispatching). Task steps must never include package installation.
 - State one shared verify command for the plan (used as `--verify`), plus per-task
-  additions only when needed.
+  additions only when needed. Use the project's native toolchain (npm test,
+  bundle exec rspec, mvn -q test, pytest, cargo test, go test ./..., ...); the
+  runner is language-agnostic and just executes the command.
 - If requirements are ambiguous, list the open questions at the top of the plan
   instead of guessing.
 

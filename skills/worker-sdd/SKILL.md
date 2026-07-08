@@ -44,12 +44,15 @@ progress updates, diff capture, report validation, single-run lock):
 0. Before the first dispatch of a plan, set the executable acceptance gate once:
    `next <plan.md> --verify '<test command>'` — it persists and gates every task's
    completion (`complete` then requires exit 0 + report DONE + verify pass).
+   Use the project's native toolchain: `npm test`, `bundle exec rspec`,
+   `mvn -q test`, `pytest`, `cargo test`, `go test ./...`, etc.
    Direct-edit exception: a change of ≤ 2 files / ≤ ~30 lines that you can specify
    exactly is cheaper to edit yourself (then run verify, commit) than to dispatch.
 1. Before dispatching a task, install any packages its "New dependencies" line
-   names (`pnpm add` / `npm i`) — workers have no network. For tasks that
-   genuinely need outbound network (e.g. hitting an external API), add `--net`
-   to that one dispatch; FS/.git protection stays on.
+   names, using the project's own package manager (npm/pnpm, bundler, maven/
+   gradle, pip/uv, cargo, go mod, ...) — workers have no network. For tasks
+   that genuinely need outbound network (e.g. hitting an external API), add
+   `--net` to that one dispatch; FS/.git protection stays on.
 2. Dispatch **in the background** (see below): prefer `next <plan.md>` — it picks the
    first non-complete task; use `run <plan.md> --task TASK-N` only to override.
 2. While it runs, keep orchestrating. Do not poll in a loop; the background job

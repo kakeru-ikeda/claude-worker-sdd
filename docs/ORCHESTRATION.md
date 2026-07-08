@@ -34,8 +34,10 @@ bookkeeping the runner already does, stop.
 - **Executable acceptance**: pass `--verify '<command>'` on the first dispatch and it
   persists as the plan default — every task (and retry) only reaches `complete` if the
   command exits 0 after the engine run. Output goes to `attempts/<N>/verify.log`.
-  Always set this when the repo has tests (`--verify 'npm test'` or equivalent);
-  it converts diff-review judgment into mechanics.
+  Always set this when the repo has tests; use the project's native toolchain —
+  `npm test`, `bundle exec rspec`, `mvn -q test`, `pytest`, `cargo test`,
+  `go test ./...` — the runner just executes a shell command and is
+  language-agnostic. It converts diff-review judgment into mechanics.
 
 ## 2. The dispatch loop
 
@@ -43,10 +45,12 @@ bookkeeping the runner already does, stop.
 # `sdd-worker` is on PATH via `npm link` (AGENTS.md setup). Fallback:
 # node <claude-worker-sdd repo>/runner/dist/index.js
 
-# 0. First dispatch of a plan: set the executable acceptance gate once
-sdd-worker next docs/plans/<feature>.md --verify 'npm test'   # persists for all later tasks
+# 0. First dispatch of a plan: set the executable acceptance gate once, using the
+#    project's own test command (npm test / bundle exec rspec / mvn -q test / ...)
+sdd-worker next docs/plans/<feature>.md --verify '<project test cmd>'   # persists for all later tasks
 
-# 1. Install the task's "New dependencies" first (workers have no network), then
+# 1. Install the task's "New dependencies" with the project's package manager
+#    (npm/pnpm, bundler, maven/gradle, pip/uv, cargo, go mod) — workers have no network. Then
 #    dispatch — ALWAYS as a background shell job (run_in_background: true).
 #    --net opts one dispatch into outbound network (recorded in task.yaml);
 #    FS/.git protection always stays on.

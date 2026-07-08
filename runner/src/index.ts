@@ -108,7 +108,7 @@ async function run(argv: string[]): Promise<number> {
   const workspace = await findWorkspace();
 
   if (command === "help" || command === "--help") {
-    console.log("Usage: sdd-worker run <plan.md> [--task TASK-001] [--engine codex] [--model gpt-5.4] [--verify 'npm test'] [--net] [--force]");
+    console.log("Usage: sdd-worker run <plan.md> [--task TASK-001] [--engine codex] [--model gpt-5.4] [--verify '<test cmd>'] [--net] [--force]");
     console.log("       (--net: opt-in outbound network for that dispatch only; FS/.git protection stays)");
     console.log("       sdd-worker next [<plan.md>] [--engine codex] [--model gpt-5.4]   dispatch first non-complete task");
     console.log("       (--verify persists as the plan default and gates every task's completion)");
