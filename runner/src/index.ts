@@ -114,6 +114,7 @@ async function run(argv: string[]): Promise<number> {
     console.log("       sdd-worker one-shot \"<instruction>\" [--agent explorer] [--engine codex]");
     console.log("       sdd-worker review TASK-001 [--plan <plan.md>] [--engine codex] [--model gpt-5.5]");
     console.log("       sdd-worker retry TASK-001 [--plan <plan.md>] [--engine codex] [--model gpt-5.4]");
+    console.log("       sdd-worker accept TASK-001 [--note \"why\"]              mark a failed task complete after manual review");
     console.log("       sdd-worker status [--plan <plan.md>]");
     console.log("       sdd-worker set <TASK-ID> engine|model <value> [--plan <plan.md>]");
     console.log("       sdd-worker guide [<topic>]                    print playbook section on demand");
@@ -511,11 +512,13 @@ async function run(argv: string[]): Promise<number> {
           );
         } else if (!reportPresent) {
           console.error(
-            "hint: verify passed but report.yaml is missing — retry once as-is (the dispatch restates the report contract); on a second miss, review diff.patch and decide manually.",
+            `hint: verify passed but report.yaml is missing. Choose ONE (never both): review diff.patch and accept ` +
+              `('sdd-worker accept ${id} --note "..."' then commit), OR retry. If the work looks right, accept — do not re-run it.`,
           );
         } else {
           console.error(
-            `hint: report status "${reportStatus}" is unrecognized and verify passed — read report.yaml, then decide: accept manually (review diff.patch, commit) or retry.`,
+            `hint: report status "${reportStatus}" is unrecognized and verify passed. Choose ONE (never both): review diff.patch ` +
+              `and accept ('sdd-worker accept ${id} --note "..."' then commit), OR retry.`,
           );
         }
       }
@@ -598,6 +601,30 @@ async function run(argv: string[]): Promise<number> {
     item.reviewed = result.exitCode === 0 && existsSync(join(taskDir, "review.yaml"));
     await saveProgress(workspace, active.slug, progress);
     return result.exitCode;
+  }
+
+  if (command === "accept") {
+    const id = rest[0];
+    if (!id) throw new Error('Usage: accept <TASK-ID> [--note "why"] [--plan <plan.md>]');
+    const active = await resolveActivePlan(workspace, flags);
+    const progress = await loadProgressFor(workspace, active.slug);
+    const item = progress.tasks[id];
+    if (!item) throw new Error(`${id} not found in progress.yaml`);
+    if (item.status === "complete") {
+      console.log(`${id} is already complete`);
+      return 0;
+    }
+    item.status = "complete";
+    if (!item.attempts) item.attempts = [];
+    item.attempts.push({
+      type: "orchestrator-accept",
+      note: typeof flags.note === "string" ? flags.note : "accepted manually after diff review",
+      accepted_at: new Date().toISOString(),
+    });
+    await saveProgress(workspace, active.slug, progress);
+    console.log(`${id} accepted (complete).`);
+    console.log("next: commit the accepted work if not committed yet, then dispatch the next task with 'next'.");
+    return 0;
   }
 
   if (command === "set") {

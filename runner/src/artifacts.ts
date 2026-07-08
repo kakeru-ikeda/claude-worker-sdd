@@ -1,11 +1,20 @@
 import { existsSync } from "node:fs";
 import { rename, rm } from "node:fs/promises";
-import { basename, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { AgentName, EngineName, Progress, TaskSpec } from "./types.js";
 import { ensureDir, readYaml, writeText, writeYaml } from "./fsutil.js";
 import { defaultTitle, taskDirName, taskId, writeBrief } from "./superpowers.js";
 
 const DEFAULT_ENGINE: EngineName = "codex";
+
+// Schemas ship with the runner, not with the consumer repo: resolve them
+// relative to this module (dist/artifacts.js -> repo root -> sdd/schemas).
+const RUNNER_REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+export function schemaPath(name: string): string {
+  return join(RUNNER_REPO_ROOT, "sdd", "schemas", name);
+}
 
 export function sddRoot(workspace: string): string {
   return join(workspace, ".superpowers", "sdd");
@@ -187,6 +196,7 @@ export async function prepareTask(input: {
       "Do not redesign architecture",
       "Ask/block if requirements are ambiguous",
       "The sandbox has no network access: if a new dependency is required, do NOT fake, vendor, or shim it — write report.yaml with status BLOCKED naming the package and stop",
+      "Do not start dev servers or bind ports (the sandbox forbids it): browser/visual verification is the orchestrator's job via the plan's verify command outside the sandbox",
     ],
   };
 
@@ -217,7 +227,7 @@ export async function prepareTask(input: {
         "Read task.yaml and brief.md, execute the scoped task, then write report.yaml. " +
         "The report's status field MUST be exactly one of: DONE, DONE_WITH_CONCERNS, BLOCKED, NEEDS_CONTEXT.",
       report_status_allowed: ["DONE", "DONE_WITH_CONCERNS", "BLOCKED", "NEEDS_CONTEXT"],
-      report_schema: resolve(input.workspace, "sdd/schemas/report.schema.json"),
+      report_schema: schemaPath("report.schema.json"),
     },
   });
 
@@ -272,7 +282,7 @@ export async function prepareReview(input: {
     },
     instructions: {
       summary: "Review this task implementation. Write review.yaml using the review schema.",
-      review_schema: resolve(input.workspace, "sdd/schemas/review.schema.json"),
+      review_schema: schemaPath("review.schema.json"),
     },
   });
 
