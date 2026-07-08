@@ -46,7 +46,10 @@ bookkeeping the runner already does, stop.
 # 0. First dispatch of a plan: set the executable acceptance gate once
 sdd-worker next docs/plans/<feature>.md --verify 'npm test'   # persists for all later tasks
 
-# 1. Dispatch next task — ALWAYS as a background shell job (run_in_background: true)
+# 1. Install the task's "New dependencies" first (workers have no network), then
+#    dispatch — ALWAYS as a background shell job (run_in_background: true).
+#    --net opts one dispatch into outbound network (recorded in task.yaml);
+#    FS/.git protection always stays on.
 sdd-worker next docs/plans/<feature>.md            # picks first non-complete task
 
 # 2. While it runs: do other work. Do NOT poll in a loop; the background job

@@ -18,6 +18,12 @@ export const codexAdapter: EngineAdapter = {
       args.push("--model", input.task.engine.model);
     }
 
+    // Opt-in per-task network (sdd-worker --net): outbound only, FS/.git
+    // protections stay intact.
+    if (input.task.network && input.mode === "run") {
+      args.push("-c", "sandbox_workspace_write.network_access=true");
+    }
+
     args.push(
       `Read ${input.dispatchPath} and execute it completely. Write the required YAML output file before finishing.`,
     );

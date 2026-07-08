@@ -27,6 +27,7 @@ Write the plan to `docs/plans/<yyyy-mm-dd>-<feature-slug>.md` with this structur
 ### Task 1: <imperative title>
 - Files to touch: <exact paths>
 - Files NOT to touch: <paths/globs>
+- New dependencies: <packages with versions, or "none">
 - Steps: <numbered, concrete>
 - Acceptance: <observable outcomes>
 - Verify: <exact shell command>
@@ -46,6 +47,9 @@ Rules:
   orchestrator commits after reviewing each task. Do not include "start the dev
   server and check visually" steps either; put browser checks in the verify
   command or leave them to the orchestrator.
+- Workers run in a no-network sandbox: every task MUST declare its new
+  dependencies in the "New dependencies" line (the orchestrator installs them
+  before dispatching). Task steps must never include package installation.
 - State one shared verify command for the plan (used as `--verify`), plus per-task
   additions only when needed.
 - If requirements are ambiguous, list the open questions at the top of the plan

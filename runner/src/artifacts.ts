@@ -163,6 +163,7 @@ export async function prepareTask(input: {
   model?: string;
   agent?: AgentName;
   verifyCommand?: string;
+  net?: boolean;
 }): Promise<{ task: TaskSpec; taskDir: string; dispatchPath: string }> {
   const id = taskId(input.index);
   const dir = join(planRoot(input.workspace, input.slug), "tasks", taskDirName(input.index));
@@ -189,13 +190,16 @@ export async function prepareTask(input: {
       agent: input.engine === "opencode" ? input.agent ?? "executor" : null,
     },
     worktree: { enabled: false, base: null, path: null },
+    ...(input.net ? { network: true } : {}),
     ...(input.verifyCommand ? { verify: { commands: [input.verifyCommand] } } : {}),
     acceptance: ["Complete the scoped task brief", "Write the required YAML report"],
     constraints: [
       "Implement only this task",
       "Do not redesign architecture",
       "Ask/block if requirements are ambiguous",
-      "The sandbox has no network access: if a new dependency is required, do NOT fake, vendor, or shim it — write report.yaml with status BLOCKED naming the package and stop",
+      input.net
+        ? "Outbound network access is ENABLED for this task only — install exactly the dependencies the task names, nothing else"
+        : "The sandbox has no network access: if a new dependency is required, do NOT fake, vendor, or shim it — write report.yaml with status BLOCKED naming the package and stop",
       "Do not start dev servers or bind ports (the sandbox forbids it): browser/visual verification is the orchestrator's job via the plan's verify command outside the sandbox",
       "Never run git add/commit/push — .git is read-only for workers and the orchestrator commits; even if the plan text says to commit, skip that step silently and list the files in the report instead",
     ],

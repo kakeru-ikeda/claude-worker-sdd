@@ -25,6 +25,7 @@ export type TaskSpec = {
     base?: string | null;
     path?: string | null;
   };
+  network?: boolean;
   scope?: {
     allow_files?: string[];
     deny_files?: string[];

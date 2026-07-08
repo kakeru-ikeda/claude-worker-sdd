@@ -108,7 +108,8 @@ async function run(argv: string[]): Promise<number> {
   const workspace = await findWorkspace();
 
   if (command === "help" || command === "--help") {
-    console.log("Usage: sdd-worker run <plan.md> [--task TASK-001] [--engine codex] [--model gpt-5.4] [--verify 'npm test'] [--force]");
+    console.log("Usage: sdd-worker run <plan.md> [--task TASK-001] [--engine codex] [--model gpt-5.4] [--verify 'npm test'] [--net] [--force]");
+    console.log("       (--net: opt-in outbound network for that dispatch only; FS/.git protection stays)");
     console.log("       sdd-worker next [<plan.md>] [--engine codex] [--model gpt-5.4]   dispatch first non-complete task");
     console.log("       (--verify persists as the plan default and gates every task's completion)");
     console.log("       sdd-worker one-shot \"<instruction>\" [--agent explorer] [--engine codex]");
@@ -252,7 +253,7 @@ async function run(argv: string[]): Promise<number> {
       planPath,
       "--task",
       taskId(nextIndex),
-      ...flagArgs(flags, ["engine", "model", "agent", "verify", "force"]),
+      ...flagArgs(flags, ["engine", "model", "agent", "verify", "net", "force"]),
     ]);
   }
 
@@ -278,7 +279,7 @@ async function run(argv: string[]): Promise<number> {
       adhocRel,
       "--task",
       "TASK-001",
-      ...flagArgs(flags, ["engine", "model", "agent", "verify"]),
+      ...flagArgs(flags, ["engine", "model", "agent", "verify", "net"]),
     ]);
   }
 
@@ -342,6 +343,7 @@ async function run(argv: string[]): Promise<number> {
         model,
         agent,
         verifyCommand,
+        net: flags.net === true,
       });
 
       const previousTaskState = progress.tasks[id];
@@ -460,6 +462,7 @@ async function run(argv: string[]): Promise<number> {
         command: result.command,
         exit_code: result.exitCode,
         status: succeeded ? "completed" : "failed",
+        network_access: task.network ?? false,
         report_present: reportPresent,
         report_status: reportNorm,
         report_status_raw: reportStatus,
@@ -567,6 +570,7 @@ async function run(argv: string[]): Promise<number> {
       ...(model ? ["--model", model] : []),
       "--agent",
       agent,
+      ...(flags.net === true ? ["--net"] : []),
     ]);
   }
 

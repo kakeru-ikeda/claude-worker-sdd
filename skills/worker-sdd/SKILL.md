@@ -46,7 +46,11 @@ progress updates, diff capture, report validation, single-run lock):
    completion (`complete` then requires exit 0 + report DONE + verify pass).
    Direct-edit exception: a change of ≤ 2 files / ≤ ~30 lines that you can specify
    exactly is cheaper to edit yourself (then run verify, commit) than to dispatch.
-1. Dispatch **in the background** (see below): prefer `next <plan.md>` — it picks the
+1. Before dispatching a task, install any packages its "New dependencies" line
+   names (`pnpm add` / `npm i`) — workers have no network. For tasks that
+   genuinely need outbound network (e.g. hitting an external API), add `--net`
+   to that one dispatch; FS/.git protection stays on.
+2. Dispatch **in the background** (see below): prefer `next <plan.md>` — it picks the
    first non-complete task; use `run <plan.md> --task TASK-N` only to override.
 2. While it runs, keep orchestrating. Do not poll in a loop; the background job
    re-invokes you on exit.
