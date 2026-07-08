@@ -198,3 +198,42 @@ Spend tokens disproportionately at the plan stage:
   validation in the runner; never trust exit codes.
 - **`.git` write denial**: codex sandbox cannot commit. Lesson: §4 orchestrator-commits
   protocol.
+- **2026-07-08 report-string gate**: engines wrote `completed`/`blocked` instead of
+  the schema enum; exact-string matching failed finished tasks AND skipped verify
+  (which was gated behind reportOk). Lesson: normalize statuses; verify runs
+  independently — never let the least reliable signal gate the most reliable one.
+- **2026-07-08 schema path**: dispatch.yaml resolved report_schema against the
+  consumer repo, so engines never saw the schema (root cause of free-form reports).
+  Lesson: runner assets resolve from the runner install, never the workspace.
+- **2026-07-08 backtick YAML**: a concerns bullet starting with a backtick is invalid
+  YAML (reserved indicator char), so a healthy DONE_WITH_CONCERNS report parsed as
+  INVALID_YAML. Lesson: line-wise status extraction fallback; markdown-flavored
+  engine prose is a recurring class, not a one-off.
+- **2026-07-08 accept-or-retry, did both**: the failure hint offered "accept manually
+  or retry"; the orchestrator committed AND retried, and the second run found the
+  work already at HEAD. Lesson: provide a verb for every terminal decision
+  (`sdd-worker accept`); hints must say "choose ONE, never both".
+- **2026-07-08 fake dependency shim**: a task needed react-router-dom in the
+  no-network sandbox; the executor fabricated a local shim instead of reporting
+  BLOCKED. Lesson: constraints forbid faking/vendoring dependencies — report BLOCKED
+  with the package name; the orchestrator installs and retries.
+- **2026-07-08 port-bind EPERM**: workers cannot start dev servers; per-page
+  Playwright checks fell to the orchestrator (the session's largest token cost).
+  Lesson: browser/visual checks belong in the verify command or batched
+  orchestrator passes, never in worker task steps.
+
+## 10. Trace audit loop (how this document grows)
+
+After every real orchestration session, audit before moving on:
+
+1. Read the session's final summary and `sdd-worker status` for the plan; skim the
+   per-task `status.yaml` files for anything failed, retried, or accepted manually.
+2. Classify every anomaly: **runner bug** (fix the runner — enforcement beats prose),
+   **contract gap** (extend default constraints / dispatch instructions / planner
+   rules), or **orchestrator misjudgment** (improve the printed hint, or add the
+   missing verb).
+3. Append the incident and its lesson to §9. One line of enforcement is worth a
+   paragraph of guidance.
+
+The runner exists so that orchestration quality survives model downgrades; this loop
+exists so the runner keeps earning that.
