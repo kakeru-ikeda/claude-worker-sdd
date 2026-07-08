@@ -186,6 +186,7 @@ export async function prepareTask(input: {
       "Implement only this task",
       "Do not redesign architecture",
       "Ask/block if requirements are ambiguous",
+      "The sandbox has no network access: if a new dependency is required, do NOT fake, vendor, or shim it — write report.yaml with status BLOCKED naming the package and stop",
     ],
   };
 
@@ -212,7 +213,10 @@ export async function prepareTask(input: {
       status_file: join(dir, "status.yaml"),
     },
     instructions: {
-      summary: "Read task.yaml and brief.md, execute the scoped task, then write report.yaml.",
+      summary:
+        "Read task.yaml and brief.md, execute the scoped task, then write report.yaml. " +
+        "The report's status field MUST be exactly one of: DONE, DONE_WITH_CONCERNS, BLOCKED, NEEDS_CONTEXT.",
+      report_status_allowed: ["DONE", "DONE_WITH_CONCERNS", "BLOCKED", "NEEDS_CONTEXT"],
       report_schema: resolve(input.workspace, "sdd/schemas/report.schema.json"),
     },
   });

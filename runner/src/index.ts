@@ -61,6 +61,24 @@ function asAgent(value: unknown): AgentName | undefined {
     : undefined;
 }
 
+// Engines write report statuses loosely ("completed", "success", ...). Normalize
+// instead of gating on exact enum strings — the executable verify is the real gate.
+function normalizeReportStatus(raw: string | null): string | null {
+  if (!raw) return null;
+  const s = raw.trim().toUpperCase().replace(/[\s-]+/g, "_");
+  if (["DONE", "COMPLETE", "COMPLETED", "SUCCESS", "SUCCEEDED", "FINISHED", "OK"].includes(s)) {
+    return "DONE";
+  }
+  if (["DONE_WITH_CONCERNS", "COMPLETED_WITH_CONCERNS", "CONCERNS"].includes(s)) {
+    return "DONE_WITH_CONCERNS";
+  }
+  if (["BLOCKED", "BLOCKING"].includes(s)) return "BLOCKED";
+  if (["NEEDS_CONTEXT", "NEED_CONTEXT", "NEEDS_INFO", "QUESTION"].includes(s)) {
+    return "NEEDS_CONTEXT";
+  }
+  return s;
+}
+
 function flagArgs(flags: Record<string, string | true>, keys: string[]): string[] {
   const out: string[] = [];
   for (const key of keys) {
@@ -378,7 +396,9 @@ async function run(argv: string[]): Promise<number> {
         }
       }
       const engineOk = result.exitCode === 0;
-      const reportOk = reportStatus === "DONE" || reportStatus === "DONE_WITH_CONCERNS";
+      const reportNorm = normalizeReportStatus(reportStatus);
+      const workerHalted = reportNorm === "BLOCKED" || reportNorm === "NEEDS_CONTEXT";
+      const reportOk = reportNorm === "DONE" || reportNorm === "DONE_WITH_CONCERNS";
 
       // Capture the worker's diff before verify runs, so build/test side effects
       // do not pollute the reviewed patch.
@@ -398,10 +418,11 @@ async function run(argv: string[]): Promise<number> {
         }
       }
 
-      // Executable acceptance gate: a task is only complete if the plan's verify
-      // command passes. Skipped when the engine already failed.
+      // Executable acceptance gate: verify is the ground truth and runs whenever the
+      // engine finished and the worker did not halt itself — independently of report
+      // wording, so a sloppy report string can never mask (or fake) the real result.
       let verifyExit: number | null = null;
-      if (engineOk && reportOk && verifyCommand) {
+      if (engineOk && !workerHalted && verifyCommand) {
         verifyExit = await runShell(verifyCommand, {
           cwd: workspace,
           logPath: join(attemptDir, "verify.log"),
@@ -416,11 +437,13 @@ async function run(argv: string[]): Promise<number> {
           ? result.exitCode === 127
             ? `engine binary not found (${task.engine.name}) — not installed or not on PATH`
             : `engine exited ${result.exitCode}`
-          : !reportPresent
-            ? "engine exited 0 but report.yaml was not written"
-            : !reportOk
-              ? `report status is ${reportStatus}`
-              : `verify failed (exit ${verifyExit}): ${verifyCommand}`;
+          : workerHalted
+            ? `report status is ${reportNorm}`
+            : !verifyOk
+              ? `verify failed (exit ${verifyExit}): ${verifyCommand}`
+              : !reportPresent
+                ? "engine exited 0 but report.yaml was not written"
+                : `report status is ${reportStatus} (unrecognized)`;
 
       const status = {
         task_id: task.id,
@@ -430,7 +453,8 @@ async function run(argv: string[]): Promise<number> {
         exit_code: result.exitCode,
         status: succeeded ? "completed" : "failed",
         report_present: reportPresent,
-        report_status: reportStatus,
+        report_status: reportNorm,
+        report_status_raw: reportStatus,
         verify_command: verifyCommand ?? null,
         verify_exit: verifyExit,
         failure_reason: failureReason,
@@ -445,7 +469,7 @@ async function run(argv: string[]): Promise<number> {
         engine: task.engine.name,
         model: task.engine.model ?? null,
         exit_code: result.exitCode,
-        report_status: reportStatus,
+        report_status: reportNorm,
         verify_exit: verifyExit,
         finished_at: new Date().toISOString(),
       });
@@ -476,18 +500,22 @@ async function run(argv: string[]): Promise<number> {
                 `(max 2 retries, never retry unchanged). Full tree: sdd-worker guide triage`,
             );
           }
-        } else if (!reportPresent) {
-          console.error(
-            "hint: retry once as-is (the dispatch restates the report contract); on a second miss, switch engine or escalate to the user.",
-          );
-        } else if (!reportOk) {
+        } else if (workerHalted) {
           console.error(
             "hint: read report.yaml (concerns field) — the worker is blocked or asking a question. Amend the task constraints to answer it, then retry. Do not retry unchanged.",
           );
+        } else if (!verifyOk) {
+          console.error(
+            `hint: tail -n 50 ${attemptRel}/verify.log — trust verify over the report's claim. ` +
+              `Fix trivially yourself (direct-edit rule) or retry with the failing output appended as a constraint.`,
+          );
+        } else if (!reportPresent) {
+          console.error(
+            "hint: verify passed but report.yaml is missing — retry once as-is (the dispatch restates the report contract); on a second miss, review diff.patch and decide manually.",
+          );
         } else {
           console.error(
-            `hint: tail -n 50 ${attemptRel}/verify.log — trust verify over the report's DONE. ` +
-              `Fix trivially yourself (direct-edit rule) or retry with the failing output appended as a constraint.`,
+            `hint: report status "${reportStatus}" is unrecognized and verify passed — read report.yaml, then decide: accept manually (review diff.patch, commit) or retry.`,
           );
         }
       }
