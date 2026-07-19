@@ -1,7 +1,7 @@
 ---
 name: planner
 description: Design and implementation planning for worker-sdd. Use PROACTIVELY before dispatching worker tasks when no plan document exists yet. Produces Superpowers-style plan documents with per-task acceptance criteria and verify commands.
-model: opus
+model: fable
 tools: Read, Glob, Grep, Bash, Write, Edit
 ---
 

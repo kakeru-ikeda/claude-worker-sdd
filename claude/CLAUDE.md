@@ -14,8 +14,12 @@ whole playbook into context.
 **Layer 1: Claude Code subagents** (native Agent tool, Claude models, spends your
 context budget):
 
-- `planner` — writes plan documents to disk on an Opus-class model and returns only
-  the file path + task list. Use for any non-trivial design. It starts with zero
+- `planner` — writes plan documents to disk on a Fable-class model when available
+  (frontmatter `model: fable`; Claude Code silently falls back to the session model
+  if the org lacks access). The user can pick a model per dispatch — pass the Agent
+  tool's `model` parameter (e.g. "planはopusで" → `model: "opus"`), which overrides
+  the frontmatter. Returns only the file path + task list. Use for any non-trivial
+  design. It starts with zero
   conversation context: always pass it the explorer findings and the user's
   requirements explicitly. Never author or transcribe the plan yourself.
 - Built-in read-only agents (Explore) — one-off codebase questions only.
