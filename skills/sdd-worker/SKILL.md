@@ -24,7 +24,7 @@ Use this for operational controls around the shared SDD runner.
 Use `status` instead of reading `progress.yaml` — it is cheaper and already computes
 the next pending task.
 
-Task IDs resolve against the active plan recorded in `.superpowers/sdd/current-plan.yaml`
+Task IDs resolve against the active plan recorded in `.sdd/current-plan.yaml`
 (set by the last `run`). Pass `--plan <plan.md>` to target a different plan's tasks.
 
 ## Command
@@ -35,4 +35,3 @@ sdd-worker {{ARGUMENTS}}
 
 (`sdd-worker` is put on PATH by `npm link` during setup; if missing, fall back to
 `node <claude-worker-sdd repo>/runner/dist/index.js`.)
-

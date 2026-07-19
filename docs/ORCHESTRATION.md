@@ -16,8 +16,11 @@ bookkeeping the runner already does, stop.
 
 ## 1. What the runner guarantees (do not re-verify)
 
-- Per-plan state isolation under `.superpowers/sdd/plans/<plan-slug>/`. A new plan
+- Per-plan state isolation under `.sdd/plans/<plan-slug>/`. A new plan
   always starts at TASK-001. Never number tasks by looking at another plan's progress.
+- On first run, the runner automatically performs a one-time migration of any
+  pre-existing legacy Superpowers state tree into `.sdd`. The `.superpowers/`
+  directory remains when it contains other content.
 - `--task` beyond the plan's task count is rejected. If you hit this error, your task
   numbering is wrong — re-read the plan, do not `--force`.
 - One run per plan at a time (`.lock`, stale-safe). A refused dispatch means one is
@@ -60,9 +63,9 @@ sdd-worker next docs/plans/<feature>.md            # picks first non-complete ta
 #    re-invokes you on exit. One tail of the stream is acceptable for a health check.
 
 # 3. On completion, read exactly these (in order, stop as soon as you can decide):
-#    - .superpowers/sdd/plans/<slug>/tasks/task-N/status.yaml   (~15 lines: verdict + failure_reason)
-#    - .superpowers/sdd/plans/<slug>/tasks/task-N/report.yaml   (worker's claim)
-#    - .superpowers/sdd/plans/<slug>/tasks/task-N/diff.patch    (the truth — review vs plan)
+#    - .sdd/plans/<slug>/tasks/task-N/status.yaml   (~15 lines: verdict + failure_reason)
+#    - .sdd/plans/<slug>/tasks/task-N/report.yaml   (worker's claim)
+#    - .sdd/plans/<slug>/tasks/task-N/diff.patch    (the truth — review vs plan)
 
 # 4. Accept → commit (see §4) → loop to step 1.
 #    Reject → triage (see §5).
@@ -195,7 +198,7 @@ Spend tokens disproportionately at the plan stage:
 
 ## 9. Known incidents (why these rules exist)
 
-- **2026-07 second-plan collision**: flat `.superpowers/sdd/` state made plan #2
+- **2026-07 second-plan collision**: flat legacy state made plan #2
   inherit plan #1's nine completed tasks; the orchestrator filed new work as
   "Task 10". Fixed by per-plan slug dirs + task-count validation. Lesson: never infer
   task numbering from stored progress — the plan file is the source of truth.

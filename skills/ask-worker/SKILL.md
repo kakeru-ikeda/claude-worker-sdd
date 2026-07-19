@@ -18,8 +18,8 @@ not part of a Superpowers plan.
 ## Rules
 
 - Pass the instruction as free text: the runner writes an ad-hoc one-task plan under
-  `.superpowers/sdd/adhoc/` and isolates its state under
-  `.superpowers/sdd/plans/adhoc-<timestamp>/` automatically.
+  `.sdd/adhoc/` and isolates its state under
+  `.sdd/plans/adhoc-<timestamp>/` automatically.
 - Pick the agent role from `sdd/agents/` (`--agent`), the engine from `sdd/adapters/`
   (`--engine`).
 - Dispatch **in the background** (Bash `run_in_background: true`), same as plan tasks.

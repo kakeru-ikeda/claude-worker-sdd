@@ -33,10 +33,13 @@ follow those hints. For deeper rules retrieve ONE playbook section on demand:
 `sdd-worker guide` lists topics, `sdd-worker guide triage|commit|tokens|...` prints
 one. Never read the whole playbook into context.
 
-All runner state is namespaced per plan under `.superpowers/sdd/plans/<plan-slug>/`
+All runner state is namespaced per plan under `.sdd/plans/<plan-slug>/`
 (slug = plan filename without `.md`). A new plan always starts at TASK-001 with an
 empty progress file — never continue numbering from another plan's progress; the
 runner rejects task IDs beyond the plan's task count.
+On first run, the runner automatically performs a one-time migration of any
+pre-existing legacy Superpowers state tree into `.sdd`; `.superpowers/` is left in
+place if it contains other content.
 
 The loop (the runner does all bookkeeping — brief, task.yaml, dispatch.yaml,
 progress updates, diff capture, report validation, single-run lock):
@@ -73,7 +76,7 @@ progress updates, diff capture, report validation, single-run lock):
 8. Stop when `next` prints "all N tasks complete"; run the plan's final verification
    (tests + build) once, directly.
 
-Task artifacts must never be written directly into `.superpowers/sdd/`. The runner
+Task artifacts must never be written directly into `.sdd/`. The runner
 auto-migrates any legacy flat layout into `plans/<slug>/` on its next invocation.
 
 ## Dispatch (non-blocking)
@@ -99,11 +102,11 @@ The runner records progress before and after the engine runs, so completion is o
 from artifacts (paths relative to the repo root; `<plan>` = `plans/<plan-slug>/`,
 `task-N` = `tasks/task-<index>/`):
 
-- `.superpowers/sdd/<plan>/progress.yaml` — task flips `status: running` → `complete` | `failed` (`complete` = engine exit 0 + report DONE-equivalent + verify command pass)
-- `.superpowers/sdd/<plan>/tasks/task-N/status.yaml` — verdict, `exit_code`, `report_status` (normalized), `verify_exit`, `failure_reason`, `untracked_files`
-- `.superpowers/sdd/<plan>/tasks/task-N/diff.patch` — auto-captured worktree diff vs HEAD; review this, not the files
-- `.superpowers/sdd/<plan>/tasks/task-N/report.yaml` — the worker's report (required output)
-- `.superpowers/sdd/<plan>/tasks/task-N/attempts/<NNN-engine-model>/stdout.jsonl` — live engine stream (tail sparingly; can be huge)
+- `.sdd/<plan>/progress.yaml` — task flips `status: running` → `complete` | `failed` (`complete` = engine exit 0 + report DONE-equivalent + verify command pass)
+- `.sdd/<plan>/tasks/task-N/status.yaml` — verdict, `exit_code`, `report_status` (normalized), `verify_exit`, `failure_reason`, `untracked_files`
+- `.sdd/<plan>/tasks/task-N/diff.patch` — auto-captured worktree diff vs HEAD; review this, not the files
+- `.sdd/<plan>/tasks/task-N/report.yaml` — the worker's report (required output)
+- `.sdd/<plan>/tasks/task-N/attempts/<NNN-engine-model>/stdout.jsonl` — live engine stream (tail sparingly; can be huge)
 
 While the background job runs, the orchestrator is free to: answer the user, dispatch
 read-only agents (`explorer` / `thinker` / `reviewer`) in parallel, and tail
@@ -115,4 +118,3 @@ and the diff to review.
 worktree while one is running (git conflicts). The runner enforces this with a per-plan
 lock — a "another run is active" error means wait, not retry. Read-only dispatches may
 run concurrently.
-
