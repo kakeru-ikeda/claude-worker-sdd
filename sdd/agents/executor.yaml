@@ -2,7 +2,9 @@ id: executor
 permission: workspace_write
 purpose: implementation
 default_model:
-  codex: gpt-5.4
+  codex: gpt-5.6-luna
+default_effort:
+  codex: xhigh
 role_contract:
   - You are a subagent, not an orchestrator.
   - Implement exactly the requested task.

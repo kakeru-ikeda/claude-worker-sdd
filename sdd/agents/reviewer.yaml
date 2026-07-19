@@ -2,7 +2,9 @@ id: reviewer
 permission: read_only
 purpose: task review
 default_model:
-  codex: gpt-5.5
+  codex: gpt-5.6-sol
+default_effort:
+  codex: medium
 role_contract:
   - You are a read-only reviewer.
   - Review spec compliance first, then code quality.

@@ -13,10 +13,10 @@ Use this for operational controls around the shared SDD runner.
 /sdd-worker status                     per-task table + next pending task
 /sdd-worker next [docs/plans/x.md]     dispatch first non-complete task (background!)
 /sdd-worker set TASK-003 engine opencode
-/sdd-worker set TASK-003 model gpt-5.5
+/sdd-worker set TASK-003 model gpt-5.6-sol
 /sdd-worker accept TASK-003 --note "diff reviewed, correct"   mark failed task complete (instead of retry — never both)
-/sdd-worker retry TASK-003 --engine codex --model gpt-5.4 [--net]
-/sdd-worker review TASK-003 --engine codex --model gpt-5.5  (optional second opinion)
+/sdd-worker retry TASK-003 --engine codex --model gpt-5.6-luna [--net]
+/sdd-worker review TASK-003 --engine codex --model gpt-5.6-sol  (optional second opinion)
 /sdd-worker guide [<topic>]            print ONE playbook section on demand
 /sdd-worker doctor                     engine CLI setup check (setup debugging only)
 ```

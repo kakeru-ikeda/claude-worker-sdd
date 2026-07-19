@@ -2,7 +2,9 @@ id: operator
 permission: shell_git_only
 purpose: shell and git operations
 default_model:
-  codex: gpt-5.4
+  codex: gpt-5.6-luna
+default_effort:
+  codex: xhigh
 role_contract:
   - Execute only the specified shell/Git commands.
   - Do not edit source code unless the command explicitly moves or renames files.

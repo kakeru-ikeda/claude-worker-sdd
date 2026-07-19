@@ -18,6 +18,10 @@ export const codexAdapter: EngineAdapter = {
       args.push("--model", input.task.engine.model);
     }
 
+    if (input.task.engine.effort) {
+      args.push("-c", `model_reasoning_effort="${input.task.engine.effort}"`);
+    }
+
     // Opt-in per-task network (sdd-worker --net): outbound only, FS/.git
     // protections stay intact.
     if (input.task.network && input.mode === "run") {

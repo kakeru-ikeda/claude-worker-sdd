@@ -2,7 +2,9 @@ id: explorer
 permission: read_only
 purpose: code investigation
 default_model:
-  codex: gpt-5.4
+  codex: gpt-5.6-luna
+default_effort:
+  codex: xhigh
 role_contract:
   - You are a read-only code investigator.
   - Search and map only what the task asks.

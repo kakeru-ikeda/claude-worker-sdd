@@ -18,6 +18,7 @@ export type TaskSpec = {
     name: EngineName;
     runner?: string | null;
     model?: string | null;
+    effort?: string | null;
     agent?: string | null;
   };
   worktree?: {

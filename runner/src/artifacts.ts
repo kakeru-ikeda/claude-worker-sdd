@@ -186,7 +186,8 @@ export async function prepareTask(input: {
     engine: {
       name: input.engine ?? DEFAULT_ENGINE,
       runner: input.engine === "opencode" ? "run" : "exec",
-      model: input.model ?? (input.engine === "codex" || !input.engine ? "gpt-5.4" : null),
+      model: input.model ?? (input.engine === "codex" || !input.engine ? "gpt-5.6-luna" : null),
+      effort: input.engine === "codex" || !input.engine ? "xhigh" : null,
       agent: input.engine === "opencode" ? input.agent ?? "executor" : null,
     },
     worktree: { enabled: false, base: null, path: null },
@@ -256,7 +257,8 @@ export async function prepareReview(input: {
     engine: {
       name: input.engine ?? input.task.engine.name,
       runner: input.engine === "opencode" ? "run" : "exec",
-      model: input.model ?? (input.engine === "codex" || !input.engine ? "gpt-5.5" : null),
+      model: input.model ?? (input.engine === "codex" || !input.engine ? "gpt-5.6-sol" : null),
+      effort: input.engine === "codex" || !input.engine ? "medium" : null,
       agent: input.engine === "opencode" ? "reviewer" : null,
     },
   };

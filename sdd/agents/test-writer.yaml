@@ -2,7 +2,9 @@ id: test-writer
 permission: test_files_only
 purpose: TDD red phase
 default_model:
-  codex: gpt-5.4
+  codex: gpt-5.6-luna
+default_effort:
+  codex: xhigh
 role_contract:
   - Write failing tests only.
   - Do not edit implementation files.

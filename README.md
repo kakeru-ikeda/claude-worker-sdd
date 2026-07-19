@@ -50,7 +50,7 @@ isolated in per-task directories.
           status.yaml            # verdict: exit_code, report_status, verify_exit, failure_reason
           diff.patch             # auto-captured worktree diff vs HEAD (pre-verify)
           attempts/
-            001-codex-gpt-5.4/
+            001-codex-gpt-5.6-luna/
               stdout.jsonl       # live engine stream
               final.md
               verify.log         # output of the --verify command
@@ -73,7 +73,7 @@ Each task can select its engine and model.
 engine:
   name: codex
   runner: exec
-  model: gpt-5.4
+  model: gpt-5.6-luna
 ```
 
 OpenCode can be selected without changing task shape:

@@ -78,7 +78,7 @@ workflows — this section is that explicit instruction:
 ## Engine switching
 
 The user can switch engines/models in natural language
-(`TASK-003だけOpenCodeに倒して`, `軽い実装はgpt-5.4で`) — apply with
+(`TASK-003だけOpenCodeに倒して`, `軽い実装はgpt-5.6-lunaで`) — apply with
 `sdd-worker set TASK-N engine|model <value>`. Priority:
 
 ```text

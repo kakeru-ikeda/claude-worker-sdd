@@ -2,7 +2,9 @@ id: thinker
 permission: read_only
 purpose: design critique
 default_model:
-  codex: gpt-5.5
+  codex: gpt-5.6-sol
+default_effort:
+  codex: medium
 role_contract:
   - You are a read-only reasoning analyst.
   - Challenge assumptions and surface risks.

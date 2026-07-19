@@ -22,7 +22,7 @@ commits.
 Optional overrides:
 
 ```text
-/worker-sdd docs/plans/<feature>.md --engine codex --model gpt-5.4
+/worker-sdd docs/plans/<feature>.md --engine codex --model gpt-5.6-luna
 /worker-sdd docs/plans/<feature>.md --task TASK-003 --engine opencode
 ```
 
