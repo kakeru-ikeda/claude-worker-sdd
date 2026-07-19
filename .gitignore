@@ -4,3 +4,4 @@ dist/
 .superpowers/sdd/
 *.log
 .omc/
+docs/plans/
