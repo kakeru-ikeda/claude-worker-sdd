@@ -26,8 +26,8 @@ export function findTaskBriefScript(): string | null {
     join(process.env.HOME ?? "", ".claude/plugins/cache/claude-plugins-official/superpowers"),
   ];
 
-  // Keep discovery conservative in the runner. Skills can still call official
-  // Superpowers scripts directly when installed in a different location.
+  // Treat the plugin script as an optional candidate; the runner has a
+  // self-contained fallback when it is not installed or discoverable.
   for (const root of candidates) {
     const direct = join(root, "scripts/task-brief");
     if (existsSync(direct)) return direct;
@@ -58,8 +58,8 @@ export async function writeBrief(input: {
       "",
       `Source plan: ${input.planPath}`,
       "",
-      "Superpowers task-brief script was not found, so this fallback brief contains the whole plan.",
-      "The orchestrator should replace this with a scoped brief before production use.",
+      "Optional external task-brief script was not found, so this fallback brief contains the whole plan.",
+      "The orchestrator should replace it with a scoped brief before production use.",
       "",
       "```md",
       plan,
@@ -84,4 +84,3 @@ export function countPlanTasks(planText: string): number | null {
   }
   return max > 0 ? max : null;
 }
-

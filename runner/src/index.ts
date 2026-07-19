@@ -22,7 +22,7 @@ import {
 } from "./artifacts.js";
 import { ensureDir, readText, readYaml, writeText, writeYaml } from "./fsutil.js";
 import { captureCommand, runShell } from "./shell.js";
-import { countPlanTasks, findTaskBriefScript, findWorkspace, taskId } from "./superpowers.js";
+import { countPlanTasks, findTaskBriefScript, findWorkspace, taskId } from "./plan.js";
 import type { AgentName, EngineName, TaskSpec } from "./types.js";
 
 function parseArgs(argv: string[]): { command: string; rest: string[]; flags: Record<string, string | true> } {

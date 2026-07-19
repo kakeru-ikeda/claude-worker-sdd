@@ -4,7 +4,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AgentName, EngineName, Progress, TaskSpec } from "./types.js";
 import { ensureDir, readYaml, writeText, writeYaml } from "./fsutil.js";
-import { defaultTitle, taskDirName, taskId, writeBrief } from "./superpowers.js";
+import { defaultTitle, taskDirName, taskId, writeBrief } from "./plan.js";
 
 const DEFAULT_ENGINE: EngineName = "codex";
 
