@@ -1,5 +1,6 @@
 node_modules/
 dist/
+.sdd/
 .superpowers/sdd/
 *.log
 .omc/

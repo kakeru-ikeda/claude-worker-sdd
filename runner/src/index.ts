@@ -9,6 +9,7 @@ import {
   loadCurrentPlan,
   loadProgressFor,
   migrateLegacyLayout,
+  migrateStateRoot,
   normalizePlanPath,
   planSlug,
   prepareReview,
@@ -106,6 +107,7 @@ async function resolveActivePlan(
 async function run(argv: string[]): Promise<number> {
   const { command, rest, flags } = parseArgs(argv);
   const workspace = await findWorkspace();
+  await migrateStateRoot(workspace);
 
   if (command === "help" || command === "--help") {
     console.log("Usage: sdd-worker run <plan.md> [--task TASK-001] [--engine codex] [--model gpt-5.4] [--verify '<test cmd>'] [--net] [--force]");
@@ -183,7 +185,7 @@ async function run(argv: string[]): Promise<number> {
       if (current) ({ plan, slug } = current);
     }
     if (!plan || !slug) {
-      console.log("No active plan (no .superpowers/sdd/current-plan.yaml). Pass --plan <plan.md>.");
+      console.log("No active plan (no .sdd/current-plan.yaml). Pass --plan <plan.md>.");
       return 0;
     }
     console.log(`plan: ${plan} (slug: ${slug})`);
@@ -268,7 +270,7 @@ async function run(argv: string[]): Promise<number> {
       throw new Error('Usage: one-shot "<instruction>" [--agent explorer] [--engine codex]');
     }
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const adhocRel = join(".superpowers", "sdd", "adhoc", `adhoc-${stamp}.md`);
+    const adhocRel = join(".sdd", "adhoc", `adhoc-${stamp}.md`);
     const title = instruction.length > 80 ? `${instruction.slice(0, 77)}...` : instruction;
     await writeText(
       join(workspace, adhocRel),
@@ -664,4 +666,3 @@ run(process.argv.slice(2)).then(
     process.exit(1);
   },
 );
-

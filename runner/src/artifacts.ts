@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { rename, rm } from "node:fs/promises";
+import { rename, rm, rmdir } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AgentName, EngineName, Progress, TaskSpec } from "./types.js";
@@ -17,7 +17,7 @@ export function schemaPath(name: string): string {
 }
 
 export function sddRoot(workspace: string): string {
-  return join(workspace, ".superpowers", "sdd");
+  return join(workspace, ".sdd");
 }
 
 export function planSlug(planPath: string): string {
@@ -54,7 +54,22 @@ export async function loadCurrentPlan(
   return readYaml<{ plan: string; slug: string }>(path);
 }
 
-// Pre-plans layout kept progress.yaml and tasks/ directly under .superpowers/sdd/,
+// Move the legacy state root to the neutral state root once per workspace.
+export async function migrateStateRoot(workspace: string): Promise<void> {
+  const oldRoot = join(workspace, ".superpowers", "sdd");
+  const newRoot = sddRoot(workspace);
+  if (existsSync(newRoot) || !existsSync(oldRoot)) return;
+
+  await rename(oldRoot, newRoot);
+  try {
+    await rmdir(join(workspace, ".superpowers"));
+  } catch (error: unknown) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== "ENOTEMPTY" && code !== "EEXIST" && code !== "ENOENT") throw error;
+  }
+}
+
+// Pre-plans layout kept progress.yaml and tasks/ directly under the state root,
 // so a second plan silently inherited the first plan's completed tasks. Move any
 // legacy state into plans/<slug>/ before touching progress.
 export async function migrateLegacyLayout(workspace: string): Promise<string | null> {
@@ -300,4 +315,3 @@ export async function prepareReview(input: {
 export function taskPathForProgress(workspace: string, taskDir: string): string {
   return relative(workspace, taskDir);
 }
-
