@@ -1,0 +1,25 @@
+name: Require Changeset
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  check:
+    name: Changeset present for runner changes
+    runs-on: ubuntu-latest
+    # The auto-generated "chore: release" PR consumes changesets rather than
+    # adding one; it must not be blocked by this check.
+    if: github.head_ref != 'changeset-release/main'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for a changeset
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: node .github/scripts/check-changeset.mjs
