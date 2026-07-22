@@ -20,6 +20,9 @@ marker. `doctor` is safe to run again after changing an engine installation. The
 dispatch commands (`run`, `next`, `one-shot`, `retry`, and `review`) stop with a
 Ready-gate error until setup or a successful doctor run has completed.
 
+`setup` and `doctor` print in English by default; pass `--lang ja` to get
+Japanese output instead (`sdd-worker setup --lang ja`, `sdd-worker doctor --lang ja`).
+
 Platform notes:
 
 - macOS: use a normal terminal and install Node.js 20+ before the commands above.
@@ -201,7 +204,7 @@ run. Orchestration rules live in `docs/ORCHESTRATION.md` (`sdd-worker guide`).
 
 The runner defaults to direct checkout writes. Use `worktree.enabled: true` in a task/default config when parallel write execution is needed.
 
-## Development and npm publishing
+## Development
 
 The publishable package is `runner/`. Its `prepack` step copies the repository's
 `sdd/`, `skills/`, and `claude/` assets into the package, and its publish checks run
@@ -214,20 +217,63 @@ npm --prefix runner test
 npm pack --dry-run --prefix runner
 ```
 
-Version changes are managed from the private root npm workspace with
-`@changesets/cli`. Include a changeset in each feature PR for a user-facing
-change and select the appropriate version bump:
+`main` is protected: direct pushes are rejected, and every PR must pass CI
+(`Node {20,22} on {ubuntu,macos,windows}-latest`). A PR that touches `runner/`
+must also include a changeset (see below) or the "Changeset present for runner
+changes" check fails; PRs that only touch docs/CI config are exempt.
 
-```bash
-npx changeset
+## Release flow
+
+Releases are fully automated end to end except for merging two PRs. Nothing is
+ever pushed to `main` or tagged by hand.
+
+```text
+feature PR (+ .changeset/*.md)
+  -> merge to main
+  -> Version PR workflow opens/updates "chore: release" PR
+       (bumps runner/package.json, writes runner/CHANGELOG.md)
+  -> merge "chore: release" PR
+  -> workflow pushes tag v<version> automatically
+  -> v* release workflow verifies the tag, publishes runner/ to npm
+       (Trusted Publishing / OIDC, no npm token stored)
 ```
 
-After the feature PR is merged to `main`, the Version PR workflow creates or
-updates a `chore: release` PR. Merge that PR to bump `runner/package.json`, update
-`runner/CHANGELOG.md`, and consume the changesets. The workflow then pushes the
-matching `v<version>` tag automatically, which triggers the `v*` release workflow
-and publishes `runner/` to npm with Trusted Publishing. Manual `changeset version`
-and tagging are not part of the normal release flow.
+1. **Add a changeset in your feature PR** whenever the change is user-facing:
 
-For disaster recovery only, after verifying the package version, run
-`git tag v<version> && git push origin v<version>` to create the tag manually.
+   ```bash
+   npx changeset
+   ```
+
+   This only records the bump type (patch/minor/major) and a summary in
+   `.changeset/*.md`; it does not change any version number yet.
+
+2. **Merge the feature PR** once CI and the changeset check pass.
+
+3. The `Version PR` workflow (`.github/workflows/version-pr.yml`, triggered on
+   push to `main`) runs `changeset version` behind the scenes and keeps a
+   `chore: release` PR (branch `changeset-release/main`) up to date with the
+   accumulated version bump and changelog. Multiple feature PRs can merge
+   before you release; the release PR just keeps growing. This branch is
+   exempt from the changeset-required check, since it's the PR that consumes
+   changesets rather than adding one.
+
+4. **Merge the `chore: release` PR** when you're ready to ship. Because no
+   changesets remain afterward, the same workflow instead runs
+   `.github/scripts/tag-release.mjs`, which pushes the `v<version>` tag that
+   matches the just-bumped `runner/package.json`.
+
+5. The existing tag-triggered `.github/workflows/release.yml` picks up that
+   push, verifies the tag matches the package version, and publishes to npm
+   with Trusted Publishing. A version that's already on npm is skipped, so a
+   re-pushed tag is a no-op rather than an error.
+
+The Version PR workflow pushes tags with a fine-grained PAT stored as the
+`RELEASE_PAT` repository secret (Contents: read/write, Pull requests:
+read/write, scoped to this repo only) — GitHub's default `GITHUB_TOKEN`
+cannot trigger other workflows when it pushes a tag, which would silently
+break step 5.
+
+For disaster recovery only — if the automated tag push ever fails — verify
+`runner/package.json`'s version and run
+`git tag v<version> && git push origin v<version>` manually from a local
+checkout of `main`.
