@@ -6,7 +6,12 @@ import { ensureDir } from "./fsutil.js";
 const CLAUDE_BEGIN = "<!-- sdd-worker:begin -->";
 const CLAUDE_END = "<!-- sdd-worker:end -->";
 const HOOK_FILE = "deny-superpowers-exec.mjs";
-const HOOK_COMMAND = (targetDir: string): string => `node ${join(targetDir, "hooks", HOOK_FILE)}`;
+const BOUNDARY_FILE = "sdd-boundary.md";
+const BOUNDARY_PRINTER_FILE = "print-sdd-boundary.mjs";
+const HOOK_COMMAND = (targetDir: string, file: string): string =>
+  `node "${join(targetDir, "hooks", file)}"`;
+const LEGACY_HOOK_COMMAND = (targetDir: string): string =>
+  `node ${join(targetDir, "hooks", HOOK_FILE)}`;
 
 type JsonObject = Record<string, unknown>;
 
@@ -22,6 +27,36 @@ function hasHookCommand(value: unknown, command: string): boolean {
       (hook) => isJsonObject(hook) && hook.type === "command" && hook.command === command,
     );
   });
+}
+
+function ensureHookCommand(
+  value: unknown,
+  command: string,
+  entry: JsonObject,
+  legacyCommand?: string,
+): unknown[] {
+  const existing = Array.isArray(value) ? value : [];
+  const hasCurrentCommand = hasHookCommand(existing, command);
+  let replacedLegacyCommand = false;
+  const normalized = existing.flatMap((candidate) => {
+    if (!isJsonObject(candidate) || !Array.isArray(candidate.hooks)) return [candidate];
+
+    const hooks = candidate.hooks.flatMap((hook) => {
+      if (!isJsonObject(hook) || hook.type !== "command") return [hook];
+      if (hook.command === command) return [hook];
+      if (legacyCommand === undefined || hook.command !== legacyCommand) return [hook];
+      if (hasCurrentCommand || replacedLegacyCommand) return [];
+
+      replacedLegacyCommand = true;
+      return [{ ...hook, command }];
+    });
+
+    if (hooks.length === 0 && candidate.hooks.length > 0) return [];
+    return [{ ...candidate, hooks }];
+  });
+
+  if (!hasCurrentCommand && !replacedLegacyCommand) normalized.push(entry);
+  return normalized;
 }
 
 export async function installSkills(targetDir = claudeUserDir()): Promise<void> {
@@ -41,11 +76,13 @@ export async function installSkills(targetDir = claudeUserDir()): Promise<void> 
 }
 
 export async function installHooks(targetDir = claudeUserDir()): Promise<void> {
-  const source = assetPath("claude", "hooks", HOOK_FILE);
   const hooksDir = join(targetDir, "hooks");
-  const destination = join(hooksDir, HOOK_FILE);
   await ensureDir(hooksDir);
-  await cp(source, destination);
+  await Promise.all(
+    [HOOK_FILE, BOUNDARY_FILE, BOUNDARY_PRINTER_FILE].map((file) =>
+      cp(assetPath("claude", "hooks", file), join(hooksDir, file)),
+    ),
+  );
 
   const settingsPath = join(targetDir, "settings.json");
   let settings: JsonObject = {};
@@ -57,16 +94,22 @@ export async function installHooks(targetDir = claudeUserDir()): Promise<void> {
   }
 
   const existingHooks = isJsonObject(settings.hooks) ? settings.hooks : {};
-  const preToolUse = Array.isArray(existingHooks.PreToolUse) ? [...existingHooks.PreToolUse] : [];
-  const command = HOOK_COMMAND(targetDir);
-  if (!hasHookCommand(preToolUse, command)) {
-    preToolUse.push({
+  const preToolUse = ensureHookCommand(
+    existingHooks.PreToolUse,
+    HOOK_COMMAND(targetDir, HOOK_FILE),
+    {
       matcher: "Skill",
-      hooks: [{ type: "command", command }],
-    });
-  }
+      hooks: [{ type: "command", command: HOOK_COMMAND(targetDir, HOOK_FILE) }],
+    },
+    LEGACY_HOOK_COMMAND(targetDir),
+  );
+  const sessionStart = ensureHookCommand(
+    existingHooks.SessionStart,
+    HOOK_COMMAND(targetDir, BOUNDARY_PRINTER_FILE),
+    { hooks: [{ type: "command", command: HOOK_COMMAND(targetDir, BOUNDARY_PRINTER_FILE) }] },
+  );
 
-  settings.hooks = { ...existingHooks, PreToolUse: preToolUse };
+  settings.hooks = { ...existingHooks, PreToolUse: preToolUse, SessionStart: sessionStart };
   await writeFile(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
 }
 
@@ -114,6 +157,8 @@ export async function installAll(targetDir = claudeUserDir()): Promise<{ actions
     actions: [
       "skills",
       `hooks/${HOOK_FILE}`,
+      `hooks/${BOUNDARY_FILE}`,
+      `hooks/${BOUNDARY_PRINTER_FILE}`,
       "settings.json",
       "agents/planner.md",
       "CLAUDE.md",
