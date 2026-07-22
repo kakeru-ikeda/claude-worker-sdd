@@ -37,6 +37,7 @@
     "orchestration"
   ],
   "dependencies": {
+    "@inquirer/prompts": "^8.5.2",
     "cross-spawn": "^7.0.6",
     "yaml": "^2.8.1"
   },

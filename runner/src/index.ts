@@ -36,6 +36,7 @@ import { ensureDir, readText, readYaml, writeText, writeYaml } from "./fsutil.js
 import { captureCommand, runShell } from "./shell.js";
 import { getModelCatalog } from "./models.js";
 import { countPlanTasks, findTaskBriefScript, findWorkspace, taskId } from "./plan.js";
+import { runSetup } from "./setup.js";
 import type { AgentName, EngineName, Progress, TaskSpec } from "./types.js";
 
 const COMMAND_FLAGS: Record<string, readonly string[]> = {
@@ -53,6 +54,7 @@ const COMMAND_FLAGS: Record<string, readonly string[]> = {
   guide: [],
   doctor: [],
   models: ["engine", "refresh"],
+  setup: [],
 };
 
 function parseArgs(argv: string[]): { command: string; rest: string[]; flags: Record<string, string | true> } {
@@ -344,6 +346,8 @@ async function run(argv: string[]): Promise<number> {
     console.log("       sdd-worker guide [<topic>]                    print playbook section on demand");
     console.log("       sdd-worker doctor                             check engine CLIs (setup debugging only)");
     console.log("       sdd-worker models [--engine codex] [--refresh] list available models");
+    console.log("       sdd-worker setup                              configure adapters, models, and Claude Code");
+    console.log("       After installation, run `sdd-worker setup` to get started.");
     return 0;
   }
 
@@ -353,6 +357,10 @@ async function run(argv: string[]): Promise<number> {
 
   if (command === "models") {
     return runModelsCommand(workspace, flags);
+  }
+
+  if (command === "setup") {
+    return runSetup(workspace);
   }
 
   if (command === "doctor") {
