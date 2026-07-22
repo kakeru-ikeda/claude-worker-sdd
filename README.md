@@ -2,6 +2,45 @@
 
 Claude Codeをオーケストレーター、外部CLIエージェントをsubagent workerとして使うSuperpowers SDDワークフロー。
 
+## Install and first run
+
+`sdd-worker` requires Node.js 20 or newer. Install the published CLI, then run the
+interactive setup wizard:
+
+```bash
+npm install -g sdd-worker
+sdd-worker setup
+sdd-worker doctor
+sdd-worker next docs/plans/example.md --verify 'npm test'
+```
+
+`setup` configures the adapters and models, optionally installs the Claude Code
+skills/hooks/planner assets, checks the Codex CLI, and writes the user `Ready`
+marker. `doctor` is safe to run again after changing an engine installation. The
+dispatch commands (`run`, `next`, `one-shot`, `retry`, and `review`) stop with a
+Ready-gate error until setup or a successful doctor run has completed.
+
+Platform notes:
+
+- macOS: use a normal terminal and install Node.js 20+ before the commands above.
+- Windows (native): PowerShell or Windows Terminal is supported. Bash is optional:
+  verification commands run through `bash -lc` when `bash` is on `PATH`, and fall
+  back to `cmd.exe /d /s /c` when it is not. Use a command syntax appropriate for
+  the selected shell. The Claude Code hooks are Node scripts, so Git Bash is not
+  required for installation.
+- WSL: install Node.js and `sdd-worker` inside WSL and run the CLI from the WSL
+  workspace. It uses the Linux shell behavior; a native Windows installation is a
+  separate environment.
+
+The setup wizard is interactive. In CI or another non-TTY environment it exits
+with an instruction to use `config set` and `doctor` instead:
+
+```bash
+sdd-worker config set agents.executor.model gpt-5.6-luna
+sdd-worker config set agents.executor.effort xhigh
+sdd-worker doctor
+```
+
 ## Core idea
 
 Superpowers is the source of truth for design and planning.
@@ -10,7 +49,7 @@ Superpowers is the source of truth for design and planning.
 Claude Code
   -> /superpowers:writing-plans
   -> docs/design/*.md + docs/plans/*.md
-  -> sdd-runner
+  -> sdd-worker
   -> engine adapter: codex | opencode | gemini future
   -> task report YAML
   -> Claude review / next task
@@ -90,7 +129,7 @@ engine:
 
 Gemini is included as a future adapter stub.
 
-## Runner
+## Runner and commands
 
 The TypeScript runner lives in `runner/`.
 
@@ -100,14 +139,57 @@ npm install
 npm run build
 npm link            # puts `sdd-worker` on PATH
 
-sdd-worker next docs/plans/example.md --verify '<project test cmd>'   # first dispatch sets the gate
+sdd-worker next docs/plans/example.md --verify '<project test cmd>'   # first dispatch sets the acceptance gate
 sdd-worker next docs/plans/example.md          # dispatch first non-complete task
 sdd-worker run docs/plans/example.md --task TASK-002 [--net]
 sdd-worker one-shot "map auth files" --agent explorer
-sdd-worker status | retry TASK-002 | accept TASK-002 --note "..." | review TASK-002
+sdd-worker status
+sdd-worker retry TASK-002
+sdd-worker accept TASK-002 --note "..."
+sdd-worker review TASK-002
+sdd-worker config list
+sdd-worker config get agents.executor.model
+sdd-worker config set agents.executor.model gpt-5.6-luna [--project]
+sdd-worker models [--engine codex] [--refresh]
 sdd-worker guide [<topic>]                     # print one playbook section on demand
-sdd-worker doctor                              # engine CLI setup check
+sdd-worker doctor                              # environment, engines, config, assets, and Ready checks
+sdd-worker setup                               # interactive first-time configuration
 ```
+
+### Configuration and model discovery
+
+Configuration is layered per agent. The effective priority, from highest to lowest,
+is:
+
+1. CLI overrides (`--engine`, `--model`).
+2. The task's `task.yaml` engine entry.
+3. The latest run attempt recorded in `progress.yaml`.
+4. Project config at `.sdd/config.yaml`.
+5. User config at `~/.config/sdd-worker/config.yaml` on macOS/Linux/WSL, or
+   `%APPDATA%\sdd-worker\config.yaml` on native Windows. `XDG_CONFIG_HOME` is
+   honored on non-Windows platforms.
+6. Shipped defaults in `sdd/agents/*.yaml` and `sdd/adapters/*.yaml`.
+
+Use `sdd-worker config list` to inspect user/project values, `config get <dotted.path>`
+to read a merged value, and `config set <dotted.path> <value>` to write the user
+config. Add `--project` to write `.sdd/config.yaml`. The project layer is useful for
+team-wide defaults; keep user-specific choices in the user config.
+
+`sdd-worker models` lists available models for the enabled engines and prints the
+source (`cli`, `api`, or `fallback`). Results are cached for 24 hours in
+`models-cache.yaml` beside the user config; pass `--refresh` to fetch again. Codex
+CLI/cache discovery is preferred, then the provider API when credentials are
+available, then the shipped adapter list. API visibility is only a reference list:
+it may not exactly match the models available to a user's Codex account.
+
+### Ready gate and doctor
+
+`setup` and `doctor` are the entry points for readiness. `setup` requires an
+interactive TTY and saves `ready: { engine, checked_at }` in the user config only
+after the Codex executable check succeeds. `doctor` reports categorized checks for
+Node.js, git, engine CLIs, configuration, model-cache freshness, Claude Code assets,
+and the Ready marker; when required checks pass it refreshes `ready.checked_at`.
+Gemini remains a displayed future stub and cannot be selected by setup.
 
 The runner enforces the operational contract so the orchestrator does not have to:
 per-plan state isolation, task-count validation against the plan, a single-run lock,
@@ -118,3 +200,28 @@ only; FS/`.git` protection always on), and just-in-time next-action hints after 
 run. Orchestration rules live in `docs/ORCHESTRATION.md` (`sdd-worker guide`).
 
 The runner defaults to direct checkout writes. Use `worktree.enabled: true` in a task/default config when parallel write execution is needed.
+
+## Development and npm publishing
+
+The publishable package is `runner/`. Its `prepack` step copies the repository's
+`sdd/`, `skills/`, and `claude/` assets into the package, and its publish checks run
+type-checking and tests. To inspect the tarball locally:
+
+```bash
+npm ci --prefix runner
+npm --prefix runner run check
+npm --prefix runner test
+npm pack --dry-run --prefix runner
+```
+
+Publishing is driven by the GitHub Actions release workflow. Keep the tag equal to
+the package version (`v<version>`), create and push that tag, and configure the
+repository `NPM_TOKEN` secret:
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+The `v*` tag workflow verifies the tag/version match and runs `npm publish --access
+public` with `NPM_TOKEN`; normal development installs remain non-interactive.

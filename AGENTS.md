@@ -18,9 +18,59 @@ This repository installs a Superpowers-centered SDD workflow that can dispatch t
 
 ## Setup Instructions
 
-### Step 1: Install Claude skills
+The recommended setup is handled by the published `sdd-worker` CLI. It is
+interactive and should be run once from a terminal:
 
-Copy skills into `~/.claude/skills/`. Existing files with the same names are managed by this repo and may be overwritten after review.
+```bash
+npm install -g sdd-worker
+sdd-worker setup
+sdd-worker doctor
+```
+
+`setup` configures the adapters and per-agent models, optionally installs the
+skills, Node-based hooks, planner agent, and managed `CLAUDE.md` section, then
+checks the Codex CLI. A successful setup writes the user `Ready` marker. The
+dispatch commands (`run`, `next`, `one-shot`, `retry`, and `review`) are gated until
+that marker exists; `doctor` can refresh it after required checks pass.
+
+On native Windows, run the same commands from PowerShell or Windows Terminal;
+Git Bash is optional. Verification commands use `bash -lc` when `bash` is on
+`PATH`, otherwise `cmd.exe /d /s /c`. WSL users should install Node.js and
+`sdd-worker` inside WSL. Node.js 20+ is required on every platform.
+
+`setup` requires a TTY. For CI or another non-interactive environment, set the
+needed values explicitly and run the checks:
+
+```bash
+sdd-worker config set agents.executor.model gpt-5.6-luna
+sdd-worker config set agents.executor.effort xhigh
+sdd-worker doctor
+```
+
+User settings are stored at `~/.config/sdd-worker/config.yaml` on macOS/Linux/WSL
+and at `%APPDATA%\sdd-worker\config.yaml` on native Windows. Project defaults
+belong in `.sdd/config.yaml`; use `sdd-worker config set ... --project` to write
+them. Effective values resolve in this order:
+
+`CLI override > task.yaml > progress.yaml attempt record > project config > user config > shipped YAML defaults`.
+
+Use `sdd-worker models [--engine codex] [--refresh]` to inspect the dynamic model
+catalog. `sdd-worker doctor` also reports the cache source/freshness and Claude Code
+asset state. Gemini is a future stub and is shown as unavailable by setup/doctor.
+
+After setup, reload Claude Code skills in an already-running session:
+
+```text
+/reload-skills
+```
+
+### Manual fallback for a source checkout
+
+Use this only when the package cannot be used or while developing the runner.
+Existing files with the same names are managed by this repo and may be overwritten
+after review.
+
+#### Install Claude skills
 
 ```bash
 for skill in skills/*/; do
@@ -31,7 +81,7 @@ for skill in skills/*/; do
 done
 ```
 
-### Step 1b: Install subagents (optional, recommended)
+#### Install the planner agent
 
 ```bash
 mkdir -p ~/.claude/agents
@@ -39,36 +89,38 @@ cp claude/agents/planner.md ~/.claude/agents/planner.md
 ```
 
 `planner` runs on an Opus-class model and drafts worker-ready plan documents
-(per-task file lists, acceptance criteria, verify commands).
+(per-task file lists, acceptance criteria, and verify commands).
 
-### Step 1c: Install hooks (required when the Superpowers plugin is enabled)
+#### Install Node-based hooks
 
-Static CLAUDE.md prose loses to Superpowers' hook-injected skill chain on weaker
-models; these hooks fight at the same layer. `sdd-boundary.md` is injected as
-context at every session start, and the PreToolUse script mechanically blocks
-`superpowers:executing-plans` / `using-git-worktrees` /
-`finishing-a-development-branch` so implementation can only go through worker-sdd.
+The hooks are required when the Superpowers plugin is enabled. The SessionStart
+hook prints the SDD boundary, and the `PreToolUse` hook blocks
+`superpowers:executing-plans`, `using-git-worktrees`, and
+`finishing-a-development-branch` so implementation goes through worker-sdd.
 
 ```bash
 mkdir -p ~/.claude/hooks
-cp claude/hooks/sdd-boundary.md claude/hooks/deny-superpowers-exec.sh ~/.claude/hooks/
-chmod +x ~/.claude/hooks/deny-superpowers-exec.sh
+cp claude/hooks/sdd-boundary.md \
+  claude/hooks/deny-superpowers-exec.mjs \
+  claude/hooks/print-sdd-boundary.mjs ~/.claude/hooks/
 ```
 
-Then merge into `~/.claude/settings.json`:
+Merge these entries into `~/.claude/settings.json` without replacing unrelated
+settings. The `node` commands work on native Windows too when paths are adjusted
+to the Windows Claude directory:
 
 ```json
 "hooks": {
   "SessionStart": [
-    { "hooks": [ { "type": "command", "command": "cat \"$HOME/.claude/hooks/sdd-boundary.md\"" } ] }
+    { "hooks": [ { "type": "command", "command": "node \"$HOME/.claude/hooks/print-sdd-boundary.mjs\"" } ] }
   ],
   "PreToolUse": [
-    { "matcher": "Skill", "hooks": [ { "type": "command", "command": "\"$HOME/.claude/hooks/deny-superpowers-exec.sh\"" } ] }
+    { "matcher": "Skill", "hooks": [ { "type": "command", "command": "node \"$HOME/.claude/hooks/deny-superpowers-exec.mjs\"" } ] }
   ]
 }
 ```
 
-### Step 2: Install or merge Claude guidance
+#### Install or merge Claude guidance
 
 Do not overwrite an existing `~/.claude/CLAUDE.md` automatically. If missing, copy it. If present, merge the sections manually.
 
@@ -81,22 +133,16 @@ else
 fi
 ```
 
-### Step 3: Install runner dependencies and expose the CLI
+#### Install runner dependencies and expose the CLI
 
 ```bash
 cd runner
 npm install
 npm run build
-npm link          # puts `sdd-worker` on PATH — skills and CLAUDE.md reference it by name
-```
-
-### Step 4: Reload Claude skills
-
-```text
-/reload-skills
+npm link          # puts the `sdd-worker` bin on PATH
+sdd-worker setup
 ```
 
 ## Engine Notes
 
 Codex is the default engine for new tasks unless the task or CLI override selects another engine. OpenCode is supported through an adapter to preserve the current operating model. Gemini CLI is included as a future adapter stub.
-

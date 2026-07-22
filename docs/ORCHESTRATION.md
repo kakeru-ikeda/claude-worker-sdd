@@ -33,7 +33,8 @@ bookkeeping the runner already does, stop.
   `failed` attempts (tasks are never left stuck in `running`).
 - **Engine availability**: never preflight (`which codex` etc.). A missing binary
   fails fast with `failure_reason: engine binary not found` plus a hint;
-  `sdd-worker doctor` is for setup debugging only.
+  `sdd-worker doctor` is for setup/readiness debugging and refreshes `Ready` when
+  required checks pass.
 - **Executable acceptance**: pass `--verify '<command>'` on the first dispatch and it
   persists as the plan default — every task (and retry) only reaches `complete` if the
   command exits 0 after the engine run. Output goes to `attempts/<N>/verify.log`.
@@ -41,11 +42,27 @@ bookkeeping the runner already does, stop.
   `npm test`, `bundle exec rspec`, `mvn -q test`, `pytest`, `cargo test`,
   `go test ./...` — the runner just executes a shell command and is
   language-agnostic. It converts diff-review judgment into mechanics.
+- **Ready gate**: `run`, `next`, `one-shot`, `retry`, and `review` require a
+  non-null `ready: { engine, checked_at }` entry in the user config. `setup` writes
+  it after the interactive Codex check; `doctor` rewrites it after all required
+  checks pass. `status`, `config`, `models`, `guide`, and `doctor` remain available
+  while setup is incomplete.
+- **Effective dispatch values**: engine/model/effort resolve as
+  `CLI override > task.yaml > progress.yaml attempt record > project config > user
+  config > shipped YAML defaults`. `status` prints the effective engine/model/agent
+  for each task so the selected model is visible before another dispatch.
+- **Model catalog**: `sdd-worker models` uses a 24-hour cache and prints whether
+  each result came from the engine CLI, provider API, or shipped fallback. Use
+  `--refresh` to bypass the cache. API model visibility is advisory and may differ
+  from the models usable by the engine account.
 
 ## 2. The dispatch loop
 
 ```bash
-# `sdd-worker` is on PATH via `npm link` (AGENTS.md setup). Fallback:
+# Published installation (Node.js 20+):
+# npm install -g sdd-worker && sdd-worker setup && sdd-worker doctor
+# For a source checkout, `npm link` from `runner/` exposes the same `sdd-worker` bin.
+# Fallback:
 # node <claude-worker-sdd repo>/runner/dist/index.js
 
 # 0. First dispatch of a plan: set the executable acceptance gate once, using the
@@ -82,6 +99,30 @@ For a single scoped job outside a plan:
 ```bash
 sdd-worker one-shot "map the auth-related files and list entry points" --agent explorer
 ```
+
+### 2.1 Setup, configuration, and readiness
+
+Run `sdd-worker setup` from an interactive terminal after installation. It configures
+enabled adapters and each agent's model/effort, optionally installs the Claude Code
+skills, Node hooks, planner, and managed `CLAUDE.md` section, then checks Codex and
+writes the user Ready marker. If it is run without a TTY it exits 1; use
+`config set` followed by `doctor` for CI or other non-interactive environments.
+
+The user config is `~/.config/sdd-worker/config.yaml` on macOS/Linux/WSL (or under
+`XDG_CONFIG_HOME`) and `%APPDATA%\sdd-worker\config.yaml` on native Windows.
+Project config is `.sdd/config.yaml`. Use `sdd-worker config list`, `config get
+<dotted.path>`, or `config set <dotted.path> <value>` to inspect or update these
+layers; pass `--project` to `config set` to write the project file.
+
+On Windows native, shell verification uses `bash -lc` when `bash` is found on
+`PATH`, otherwise `cmd.exe /d /s /c`. External engine executables are resolved with
+Windows command extensions, so the CLI does not require `shell: true`. WSL follows
+the Linux shell path and should use a WSL-local Node installation.
+
+`sdd-worker models [--engine <name>] [--refresh]` prints the current catalog and its
+source. Discovery tries the engine CLI first, then the provider API when configured,
+then the shipped adapter list; it caches the result for 24 hours in
+`models-cache.yaml` next to the user config.
 
 ### Direct-edit exception
 
@@ -247,3 +288,18 @@ After every real orchestration session, audit before moving on:
 
 The runner exists so that orchestration quality survives model downgrades; this loop
 exists so the runner keeps earning that.
+
+## 11. npm release
+
+The package is published from `runner/`. CI validates the package on Ubuntu, macOS,
+and Windows; the release workflow runs only for a pushed `v*` tag. Before tagging,
+ensure the tag matches `runner/package.json` exactly (`v<version>`), and configure
+the repository `NPM_TOKEN` secret. The workflow installs dependencies and runs:
+
+```bash
+npm publish --access public
+```
+
+The package's `prepack` step copies the `sdd/`, `skills/`, and `claude/` assets, and
+`prepublishOnly` runs the type-check and test suite. A local package-content check is
+`npm pack --dry-run --prefix runner`.
