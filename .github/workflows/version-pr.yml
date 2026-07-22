@@ -1,0 +1,47 @@
+name: Version PR
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: changesets-main
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  version:
+    name: Create or update version PR
+    runs-on: ubuntu-latest
+
+    steps:
+      # RELEASE_PAT is required because tag pushes made with GITHUB_TOKEN do not trigger other workflows.
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.RELEASE_PAT }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create version PR or tag release
+        uses: changesets/action@v1
+        with:
+          version: npx changeset version
+          publish: node .github/scripts/tag-release.mjs
+          commit: "chore: release"
+          title: "chore: release"
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}

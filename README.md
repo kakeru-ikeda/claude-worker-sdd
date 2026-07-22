@@ -215,25 +215,19 @@ npm pack --dry-run --prefix runner
 ```
 
 Version changes are managed from the private root npm workspace with
-`@changesets/cli`. Add a changeset for each user-facing change and select the
-appropriate version bump:
+`@changesets/cli`. Include a changeset in each feature PR for a user-facing
+change and select the appropriate version bump:
 
 ```bash
 npx changeset
 ```
 
-At release time, apply the accumulated changesets. This bumps
-`runner/package.json` and writes `runner/CHANGELOG.md`; commit those generated
-changes before tagging the release:
+After the feature PR is merged to `main`, the Version PR workflow creates or
+updates a `chore: release` PR. Merge that PR to bump `runner/package.json`, update
+`runner/CHANGELOG.md`, and consume the changesets. The workflow then pushes the
+matching `v<version>` tag automatically, which triggers the `v*` release workflow
+and publishes `runner/` to npm with Trusted Publishing. Manual `changeset version`
+and tagging are not part of the normal release flow.
 
-```bash
-npx changeset version
-git add runner/package.json runner/CHANGELOG.md .changeset
-git commit -m "chore: release v<version>"
-git tag v<version>
-git push origin v<version>
-```
-
-The tag must exactly equal the bumped package version. The unchanged `v*` GitHub
-Actions workflow verifies that match and publishes `runner/` to npm with Trusted
-Publishing; normal development installs remain non-interactive.
+For disaster recovery only, after verifying the package version, run
+`git tag v<version> && git push origin v<version>` to create the tag manually.
