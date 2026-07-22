@@ -15,6 +15,7 @@ import {
 import { claudeUserDir } from "./paths.js";
 import { getModelCatalog } from "./models.js";
 import { captureCommand, resolveExecutable } from "./shell.js";
+import { t, type Lang, type MessageKey } from "./i18n.js";
 
 const AGENTS: readonly AgentName[] = [
   "executor",
@@ -34,13 +35,13 @@ const DEFAULTS: Record<AgentName, { model: string; effort: string }> = {
   thinker: { model: "gpt-5.6-sol", effort: "medium" },
 };
 
-const AGENT_DESCRIPTIONS: Record<AgentName, string> = {
-  executor: "実装・修正の主担当 (推奨: gpt-5.6-luna xhigh)",
-  explorer: "読み取り専用のコード調査 (推奨: gpt-5.6-luna)",
-  operator: "シェル・Git操作",
-  "test-writer": "TDDのテスト先行作成 (テストファイルのみ)",
-  reviewer: "diffの二次レビュー (推奨: gpt-5.6-sol medium)",
-  thinker: "設計・計画の批評 (読み取り専用、推奨: gpt-5.6-sol)",
+const AGENT_DESCRIPTION_KEYS: Record<AgentName, MessageKey> = {
+  executor: "agent_desc_executor",
+  explorer: "agent_desc_explorer",
+  operator: "agent_desc_operator",
+  "test-writer": "agent_desc_test_writer",
+  reviewer: "agent_desc_reviewer",
+  thinker: "agent_desc_thinker",
 };
 
 const EFFORTS = ["minimal", "low", "medium", "high", "xhigh"] as const;
@@ -66,7 +67,7 @@ function configuredAdapters(config: SddConfig): EngineName[] {
   return [...new Set(enabled)];
 }
 
-function modelChoices(models: string[], current: string): PromptChoice<string>[] {
+function modelChoices(models: string[], current: string, lang: Lang): PromptChoice<string>[] {
   const prioritized = ["gpt-5.6-luna", "gpt-5.6-sol", ...models];
   const unique = [...new Set(prioritized.filter((model) => model.trim().length > 0))];
   if (current && !unique.includes(current)) {
@@ -77,24 +78,24 @@ function modelChoices(models: string[], current: string): PromptChoice<string>[]
     ...unique.map((model) => ({
       name: model,
       value: model,
-      description: model === current ? "currently configured" : undefined,
+      description: model === current ? t(lang, "setup_currently_configured") : undefined,
     })),
-    { name: "その他 (フリー入力)", value: CUSTOM_MODEL },
+    { name: t(lang, "setup_custom_model_choice"), value: CUSTOM_MODEL },
   ];
 }
 
-function effortChoices(current: string): PromptChoice<string>[] {
+function effortChoices(current: string, lang: Lang): PromptChoice<string>[] {
   const values = [...EFFORTS];
   if (current && !values.includes(current as (typeof EFFORTS)[number])) {
     return [
       ...values.map((effort) => ({ name: effort, value: effort })),
-      { name: current, value: current, description: "currently configured" },
+      { name: current, value: current, description: t(lang, "setup_currently_configured") },
     ];
   }
   return values.map((effort) => ({
     name: effort,
     value: effort,
-    description: effort === current ? "currently configured" : undefined,
+    description: effort === current ? t(lang, "setup_currently_configured") : undefined,
   }));
 }
 
@@ -108,7 +109,7 @@ export function saveAgentSelection(
   config.agents[agent] = { ...config.agents[agent], model, effort };
 }
 
-async function configureAgents(config: SddConfig, models: string[]): Promise<void> {
+async function configureAgents(config: SddConfig, models: string[], lang: Lang): Promise<void> {
   config.agents ??= {};
 
   for (const agent of AGENTS) {
@@ -116,22 +117,25 @@ async function configureAgents(config: SddConfig, models: string[]): Promise<voi
     const defaults = DEFAULTS[agent];
     const currentModel = existing.model ?? defaults.model;
     const selectedModel = await select({
-      message: `${agent}: ${AGENT_DESCRIPTIONS[agent]}\nモデルを選択`,
-      choices: modelChoices(models, currentModel),
+      message: t(lang, "setup_model_select", {
+        agent,
+        description: t(lang, AGENT_DESCRIPTION_KEYS[agent]),
+      }),
+      choices: modelChoices(models, currentModel, lang),
       default: currentModel,
     });
     const model = selectedModel === CUSTOM_MODEL
       ? await input({
-          message: `${agent} のモデル名を入力`,
+          message: t(lang, "setup_custom_model_prompt", { agent }),
           default: currentModel,
           required: true,
-          validate: (value) => value.trim().length > 0 || "モデル名を入力してください",
+          validate: (value) => value.trim().length > 0 || t(lang, "setup_custom_model_required"),
         })
       : selectedModel;
     const currentEffort = existing.effort ?? defaults.effort;
     const effort = await select({
-      message: `${agent} の effort`,
-      choices: effortChoices(currentEffort),
+      message: t(lang, "setup_effort_prompt", { agent }),
+      choices: effortChoices(currentEffort, lang),
       default: currentEffort,
     });
 
@@ -139,67 +143,67 @@ async function configureAgents(config: SddConfig, models: string[]): Promise<voi
   }
 }
 
-async function configureClaudeAssets(): Promise<void> {
+async function configureClaudeAssets(lang: Lang): Promise<void> {
   const targetDir = claudeUserDir();
 
   if (await confirm({
-    message: "スキルを ~/.claude/skills にインストールする？ (worker-sdd等、SDD運用に必須)",
+    message: t(lang, "setup_install_skills_confirm"),
     default: true,
   })) {
     await installSkills(targetDir);
-    console.log("スキルを更新しました。");
+    console.log(t(lang, "setup_install_skills_success"));
   }
 
   if (await confirm({
-    message: "hooksとsettings.json統合を行う？ (Superpowers実装系skillのブロックとSDD境界の自動表示)",
+    message: t(lang, "setup_install_hooks_confirm"),
     default: true,
   })) {
     await installHooks(targetDir);
-    console.log("hooksとsettings.jsonを更新しました。");
+    console.log(t(lang, "setup_install_hooks_success"));
   }
 
   if (await confirm({
-    message: "plannerエージェント定義を ~/.claude/agents に置く？",
+    message: t(lang, "setup_install_planner_confirm"),
     default: true,
   })) {
     await installPlannerAgent(targetDir);
-    console.log("plannerエージェント定義を更新しました。");
+    console.log(t(lang, "setup_install_planner_success"));
   }
 
   if (await confirm({
-    message: "CLAUDE.mdにSDD設定を反映する？",
+    message: t(lang, "setup_install_claude_md_confirm"),
     default: true,
   })) {
     const mode = await select<ClaudeMdInstallMode | "skip">({
-      message: "CLAUDE.mdの反映方法",
+      message: t(lang, "setup_claude_md_mode"),
       choices: [
         {
-          name: "マーカーブロックを追記/更新 (既存内容保持・推奨)",
+          name: t(lang, "setup_claude_md_marker"),
           value: "marker",
         },
-        { name: "ファイル全体を上書き", value: "overwrite" },
-        { name: "スキップ", value: "skip" },
+        { name: t(lang, "setup_claude_md_overwrite"), value: "overwrite" },
+        { name: t(lang, "setup_claude_md_skip"), value: "skip" },
       ],
       default: "marker",
     });
     if (mode !== "skip") {
       await appendClaudeMdTemplate(targetDir, mode);
-      console.log("CLAUDE.mdを更新しました。");
+      console.log(t(lang, "setup_claude_md_success"));
     }
   }
 }
 
-async function configureAdapters(config: SddConfig): Promise<void> {
+async function configureAdapters(config: SddConfig, lang: Lang): Promise<void> {
   const configured = configuredAdapters(config);
   const enabled = await checkbox<EngineName>({
-    message: "使用するアダプタを選択してください",
+    message: t(lang, "setup_adapter_prompt"),
     required: true,
     choices: [
       {
         name: "codex",
         value: "codex",
         checked: configured.length === 0 || configured.includes("codex"),
-        disabled: "必須",
+        disabled: t(lang, "setup_adapter_required"),
       },
       {
         name: "opencode",
@@ -207,10 +211,10 @@ async function configureAdapters(config: SddConfig): Promise<void> {
         checked: configured.includes("opencode"),
       },
       {
-        name: "gemini (future - not yet available)",
+        name: `gemini (${t(lang, "setup_adapter_future")})`,
         value: "gemini",
         checked: false,
-        disabled: "future - not yet available",
+        disabled: t(lang, "setup_adapter_future"),
       },
     ],
   });
@@ -221,26 +225,24 @@ async function configureAdapters(config: SddConfig): Promise<void> {
   };
 }
 
-function printNonInteractiveMessage(): void {
-  console.error(
-    "setup は対話専用。非対話環境では `sdd-worker config set` と `doctor` を使用してください。",
-  );
+function printNonInteractiveMessage(lang: Lang): void {
+  console.error(t(lang, "setup_non_interactive"));
 }
 
-export async function runSetup(workspace: string): Promise<number> {
+export async function runSetup(workspace: string, lang: Lang = "en"): Promise<number> {
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
-    printNonInteractiveMessage();
+    printNonInteractiveMessage(lang);
     return 1;
   }
 
   const config = await loadUserConfig();
-  await configureAdapters(config);
+  await configureAdapters(config, lang);
 
   const catalog = await getModelCatalog("codex");
-  console.log(`モデルカタログ: ${catalog.source} (${catalog.models.length} 件)`);
-  await configureAgents(config, catalog.models);
+  console.log(t(lang, "setup_model_catalog", { source: catalog.source, count: catalog.models.length }));
+  await configureAgents(config, catalog.models, lang);
 
-  await configureClaudeAssets();
+  await configureClaudeAssets(lang);
 
   // Persist the choices before checking the executable so a failed setup can
   // be resumed with the values just entered. A failed check must not leave a
@@ -252,14 +254,14 @@ export async function runSetup(workspace: string): Promise<number> {
     cwd: workspace,
   });
   if (codex.code !== 0) {
-    console.error(
-      "Codex の疎通チェックに失敗しました。Codex CLI をインストールしてログインし、`sdd-worker doctor` を実行してください。",
-    );
+    console.error(t(lang, "setup_codex_failure"));
     return 1;
   }
 
   config.ready = { engine: "codex", checked_at: new Date().toISOString() };
   await saveUserConfig(config);
-  console.log(`Ready: codex ${codex.stdout.trim().split(/\r?\n/)[0] || "available"}`);
+  console.log(t(lang, "setup_ready", {
+    version: codex.stdout.trim().split(/\r?\n/)[0] || t(lang, "setup_available"),
+  }));
   return 0;
 }

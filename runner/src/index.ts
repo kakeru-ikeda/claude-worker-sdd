@@ -39,6 +39,7 @@ import { countPlanTasks, findWorkspace, taskId } from "./plan.js";
 import { runSetup } from "./setup.js";
 import { readyGateError, runDoctor, shouldGateCommand } from "./doctor.js";
 import type { AgentName, EngineName, Progress, TaskSpec } from "./types.js";
+import { resolveLang } from "./i18n.js";
 
 const COMMAND_FLAGS: Record<string, readonly string[]> = {
   run: ["task", "engine", "model", "agent", "verify", "net", "force", "dry-run"],
@@ -53,9 +54,9 @@ const COMMAND_FLAGS: Record<string, readonly string[]> = {
   help: [],
   "--help": [],
   guide: [],
-  doctor: [],
+  doctor: ["lang"],
   models: ["engine", "refresh"],
-  setup: [],
+  setup: ["lang"],
 };
 
 function parseArgs(argv: string[]): { command: string; rest: string[]; flags: Record<string, string | true> } {
@@ -355,9 +356,9 @@ async function run(argv: string[]): Promise<number> {
     console.log("       sdd-worker set <TASK-ID> engine|model <value> [--plan <plan.md>]");
     console.log("       sdd-worker config list|get <dotted.path>|set <dotted.path> <value> [--project]");
     console.log("       sdd-worker guide [<topic>]                    print playbook section on demand");
-    console.log("       sdd-worker doctor                             check engine CLIs (setup debugging only)");
+    console.log("       sdd-worker doctor [--lang en|ja]              check engine CLIs (setup debugging only)");
     console.log("       sdd-worker models [--engine codex] [--refresh] list available models");
-    console.log("       sdd-worker setup                              configure adapters, models, and Claude Code");
+    console.log("       sdd-worker setup [--lang en|ja]               configure adapters, models, and Claude Code");
     console.log("       After installation, run `sdd-worker setup` to get started.");
     return 0;
   }
@@ -371,11 +372,11 @@ async function run(argv: string[]): Promise<number> {
   }
 
   if (command === "setup") {
-    return runSetup(workspace);
+    return runSetup(workspace, resolveLang(flags.lang));
   }
 
   if (command === "doctor") {
-    return runDoctor(workspace);
+    return runDoctor(workspace, resolveLang(flags.lang));
   }
 
   if (command === "guide") {

@@ -13,6 +13,7 @@ import { captureCommand } from "./shell.js";
 import { assetPath, claudeUserDir, modelsCachePath, userConfigPath } from "./paths.js";
 import { findTaskBriefScript } from "./plan.js";
 import type { AgentName, EngineName } from "./types.js";
+import { t, type Lang } from "./i18n.js";
 
 const REQUIRED_NODE_MAJOR = 20;
 const MODEL_CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
@@ -258,8 +259,8 @@ export async function isReady(configPath = userConfigPath()): Promise<boolean> {
   }
 }
 
-export function readyGateError(): string {
-  return "Not ready. Run `sdd-worker setup` first.";
+export function readyGateError(lang: Lang = "en"): string {
+  return t(lang, "ready_gate_error");
 }
 
 export async function shouldGateCommand(
@@ -269,7 +270,8 @@ export async function shouldGateCommand(
   return READY_GATED_COMMANDS.has(command) && !(await isReady(configPath));
 }
 
-export async function runDoctor(workspace: string): Promise<number> {
+export async function runDoctor(workspace: string, lang: Lang = "en"): Promise<number> {
+  void lang;
   const configPath = userConfigPath();
   const [user, project] = await Promise.all([
     loadUserConfig(configPath),
