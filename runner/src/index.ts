@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { existsSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 import { getAdapter } from "./adapters/index.js";
@@ -93,6 +93,12 @@ function asAgent(value: unknown): AgentName | undefined {
     value === "operator"
     ? value
     : undefined;
+}
+
+export function formatDispatchLine(taskId: string, eff: EffectiveEngine, agent: AgentName): string {
+  const model = eff.model ?? "engine default";
+  const effort = eff.effort === null ? "" : ` (${eff.effort})`;
+  return `${taskId} → ${eff.engine} / ${model}${effort} / ${agent}`;
 }
 
 // Engines write report statuses loosely ("completed", "success", ...). Normalize
@@ -421,10 +427,22 @@ async function run(argv: string[]): Promise<number> {
     const ids = Object.keys(progress.tasks).sort();
     for (const id of ids) {
       const t = progress.tasks[id];
+      const storedTask = await loadStoredTask(workspace, t);
+      const agent = storedTask?.agent ?? asAgent(t.agent) ?? "executor";
+      const effective = await resolveDispatchEngine({
+        workspace,
+        agent,
+        flags: {},
+        task: storedTask,
+        progressTask: t,
+      });
+      const effectiveModel = effective.model ?? "engine default";
+      const effectiveEffort = effective.effort === null ? "" : ` (${effective.effort})`;
+      const effectiveValues = `${effective.engine}/${effectiveModel}${effectiveEffort}/${agent}`;
       const engine = `${t.engine ?? "?"}${t.model ? `/${t.model}` : ""}`;
       const attempts = t.attempts?.length ?? 0;
       console.log(
-        `${id}  ${t.status}  ${engine}  attempts=${attempts}${t.reviewed ? "  reviewed" : ""}`,
+        `${id}  ${t.status}  ${engine}  attempts=${attempts}${t.reviewed ? "  reviewed" : ""}  effective=${effectiveValues}`,
       );
     }
     const planFile = join(workspace, plan);
@@ -668,6 +686,7 @@ async function run(argv: string[]): Promise<number> {
       const attemptDir = join(taskDir, "attempts", attemptSlug);
       await ensureDir(attemptDir);
 
+      console.log(formatDispatchLine(id, resolved, task.agent));
       const adapter = getAdapter(task.engine.name);
       let result: { exitCode: number; command: string };
       try {
@@ -906,6 +925,7 @@ async function run(argv: string[]): Promise<number> {
     const attemptDir = join(taskDir, "attempts", attemptSlug);
     await ensureDir(attemptDir);
 
+    console.log(formatDispatchLine(id, resolved, reviewTask.agent));
     const adapter = getAdapter(reviewTask.engine.name);
     const result = await adapter.run({
       workspace,
@@ -971,10 +991,12 @@ async function run(argv: string[]): Promise<number> {
   throw new Error(`unknown command: ${command}`);
 }
 
-run(process.argv.slice(2)).then(
-  (code) => process.exit(code),
-  (error: unknown) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  },
-);
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  run(process.argv.slice(2)).then(
+    (code) => process.exit(code),
+    (error: unknown) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    },
+  );
+}
