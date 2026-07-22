@@ -1,18 +1,14 @@
 import { existsSync } from "node:fs";
 import { rename, rm, rmdir } from "node:fs/promises";
-import { basename, dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { basename, join, relative, resolve } from "node:path";
 import type { EffectiveEngine } from "./config.js";
 import type { AgentName, EngineName, Progress, TaskSpec } from "./types.js";
 import { ensureDir, readYaml, writeText, writeYaml } from "./fsutil.js";
+import { assetPath } from "./paths.js";
 import { defaultTitle, taskDirName, taskId, writeBrief } from "./plan.js";
 
-// Schemas ship with the runner, not with the consumer repo: resolve them
-// relative to this module (dist/artifacts.js -> repo root -> sdd/schemas).
-const RUNNER_REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-
 export function schemaPath(name: string): string {
-  return join(RUNNER_REPO_ROOT, "sdd", "schemas", name);
+  return assetPath("sdd", "schemas", name);
 }
 
 export function sddRoot(workspace: string): string {

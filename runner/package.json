@@ -1,7 +1,6 @@
 {
-  "name": "claude-worker-sdd-runner",
-  "version": "0.1.0",
-  "private": true,
+  "name": "sdd-worker",
+  "version": "0.2.0",
   "type": "module",
   "bin": {
     "sdd-worker": "dist/index.js"
@@ -9,8 +8,34 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test dist/test/*.test.js"
+    "test": "npm run build && node --test dist/test/*.test.js",
+    "copy-assets": "node scripts/copy-assets.mjs",
+    "prepack": "npm run copy-assets && npm run build",
+    "prepublishOnly": "npm run check && npm test"
   },
+  "files": [
+    "dist",
+    "assets",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kakeru-ikeda/claude-worker-sdd.git",
+    "directory": "runner"
+  },
+  "description": "Superpowers-centered SDD workflow runner for task-scoped worker delegation",
+  "keywords": [
+    "sdd",
+    "claude-code",
+    "codex",
+    "opencode",
+    "workflow",
+    "orchestration"
+  ],
   "dependencies": {
     "cross-spawn": "^7.0.6",
     "yaml": "^2.8.1"
