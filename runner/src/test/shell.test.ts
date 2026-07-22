@@ -17,9 +17,11 @@ test("resolves a Windows executable using PATH and PATHEXT", async () => {
   const executable = join(directory, "foo.cmd");
   await writeFile(executable, "@echo off\r\n");
 
+  // Windows のパス解決は大文字小文字非区別: case-insensitive FS では
+  // PATHEXT 由来の大文字候補 (foo.CMD) がそのまま返るため小文字化して比較する。
   assert.equal(
-    resolveExecutable("foo", { PATH: directory, PATHEXT: ".CMD" }, "win32"),
-    executable,
+    resolveExecutable("foo", { PATH: directory, PATHEXT: ".CMD" }, "win32").toLowerCase(),
+    executable.toLowerCase(),
   );
 });
 
