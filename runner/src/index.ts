@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import YAML from "yaml";
@@ -991,7 +991,17 @@ async function run(argv: string[]): Promise<number> {
   throw new Error(`unknown command: ${command}`);
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// npm link/global bin は symlink 経由で起動するため realpath で比較する。
+function isDirectInvocation(): boolean {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(resolve(process.argv[1])) === fileURLToPath(import.meta.url);
+  } catch {
+    return false;
+  }
+}
+
+if (isDirectInvocation()) {
   run(process.argv.slice(2)).then(
     (code) => process.exit(code),
     (error: unknown) => {
