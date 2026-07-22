@@ -98,50 +98,71 @@ function cachedCatalog(document: CacheDocument, engine: EngineName): CacheCatalo
   return isObject(nested) ? cacheEntry(nested[engine]) : null;
 }
 
-function formatReady(ready: SddConfig["ready"]): string {
-  if (!isObject(ready)) return "not set";
-  const engine = typeof ready.engine === "string" ? ready.engine : "unknown engine";
-  const checkedAt = typeof ready.checked_at === "string" ? ready.checked_at : "unknown time";
-  return `${engine}, checked_at=${checkedAt}`;
+function formatReady(ready: SddConfig["ready"], lang: Lang): string {
+  if (!isObject(ready)) return t(lang, "doctor_not_set");
+  const engine = typeof ready.engine === "string"
+    ? ready.engine
+    : t(lang, "doctor_unknown_engine");
+  const checkedAt = typeof ready.checked_at === "string"
+    ? ready.checked_at
+    : t(lang, "doctor_unknown_time");
+  return t(lang, "doctor_ready_detail", { engine, checkedAt });
 }
 
-async function inspectEnvironment(workspace: string): Promise<number> {
+async function inspectEnvironment(workspace: string, lang: Lang): Promise<number> {
   let failures = 0;
+  const category = t(lang, "doctor_category_environment");
   const nodeMajor = Number.parseInt(process.versions.node.split(".", 1)[0] ?? "0", 10);
   if (nodeMajor >= REQUIRED_NODE_MAJOR) {
-    statusLine("ok", "環境", `Node ${process.versions.node} (>= ${REQUIRED_NODE_MAJOR})`);
+    statusLine("ok", category, t(lang, "doctor_node_ok", {
+      version: process.versions.node,
+      required: REQUIRED_NODE_MAJOR,
+    }));
   } else {
-    statusLine("fail", "環境", `Node ${process.versions.node} (>= ${REQUIRED_NODE_MAJOR} required)`);
+    statusLine("fail", category, t(lang, "doctor_node_fail", {
+      version: process.versions.node,
+      required: REQUIRED_NODE_MAJOR,
+    }));
     failures += 1;
   }
-  statusLine("ok", "環境", `OS ${process.platform} ${process.arch}`);
+  statusLine("ok", category, t(lang, "doctor_os", {
+    platform: process.platform,
+    arch: process.arch,
+  }));
 
   const git = await captureCommand("git", ["--version"], { cwd: workspace });
   if (git.code === 0) {
-    statusLine("ok", "環境", `git ${firstLine(git.stdout)}`);
+    statusLine("ok", category, t(lang, "doctor_git_ok", { version: firstLine(git.stdout) }));
   } else {
-    statusLine("fail", "環境", `git not found or exits ${git.code}`);
+    statusLine("fail", category, t(lang, "doctor_git_fail", { code: git.code }));
     failures += 1;
   }
 
   const brief = findTaskBriefScript();
   statusLine(
     brief ? "ok" : "warn",
-    "環境",
+    category,
     brief
-      ? `Superpowers task-brief ${brief}`
-      : "Superpowers task-brief script not found (removed in Superpowers 6.x; built-in fallback is used — this is normal)",
+      ? t(lang, "doctor_task_brief_ok", { path: brief })
+      : t(lang, "doctor_task_brief_missing"),
   );
   return failures;
 }
 
-async function inspectEngines(workspace: string, engines: EngineName[]): Promise<number> {
+async function inspectEngines(
+  workspace: string,
+  engines: EngineName[],
+  lang: Lang,
+): Promise<number> {
   let failures = 0;
+  const category = t(lang, "doctor_category_engine");
   const codex = await captureCommand("codex", ["--version"], { cwd: workspace });
   if (codex.code === 0) {
-    statusLine("ok", "エンジン", `codex ${firstLine(codex.stdout) || "available"}`);
+    statusLine("ok", category, t(lang, "doctor_codex_ok", {
+      version: firstLine(codex.stdout) || t(lang, "doctor_available"),
+    }));
   } else {
-    statusLine("fail", "エンジン", `codex not found or exits ${codex.code} (required)`);
+    statusLine("fail", category, t(lang, "doctor_codex_fail", { code: codex.code }));
     failures += 1;
   }
 
@@ -149,58 +170,77 @@ async function inspectEngines(workspace: string, engines: EngineName[]): Promise
     const opencode = await captureCommand("opencode", ["--version"], { cwd: workspace });
     statusLine(
       opencode.code === 0 ? "ok" : "warn",
-      "エンジン",
+      category,
       opencode.code === 0
-        ? `opencode ${firstLine(opencode.stdout) || "available"}`
-        : `opencode not found or exits ${opencode.code} (optional)`,
+        ? t(lang, "doctor_opencode_ok", {
+          version: firstLine(opencode.stdout) || t(lang, "doctor_available"),
+        })
+        : t(lang, "doctor_opencode_fail", { code: opencode.code }),
     );
   } else {
-    statusLine("warn", "エンジン", "opencode disabled (optional)");
+    statusLine("warn", category, t(lang, "doctor_opencode_disabled"));
   }
 
-  statusLine("warn", "エンジン", "gemini stub (future; not available)");
+  statusLine("warn", category, t(lang, "doctor_gemini_stub"));
   return failures;
 }
 
-async function inspectConfig(workspace: string): Promise<void> {
+async function inspectConfig(workspace: string, lang: Lang): Promise<void> {
   const configPath = userConfigPath();
   const projectPath = join(workspace, ".sdd", "config.yaml");
+  const category = t(lang, "doctor_category_config");
   statusLine(
     existsSync(configPath) ? "ok" : "warn",
-    "設定",
-    `user config ${existsSync(configPath) ? "present" : "not found"}: ${configPath}`,
+    category,
+    t(lang, "doctor_user_config", {
+      state: t(lang, existsSync(configPath) ? "doctor_present" : "doctor_not_found"),
+      path: configPath,
+    }),
   );
   statusLine(
     existsSync(projectPath) ? "ok" : "warn",
-    "設定",
-    `project config ${existsSync(projectPath) ? "present" : "not found"}: ${projectPath}`,
+    category,
+    t(lang, "doctor_project_config", {
+      state: t(lang, existsSync(projectPath) ? "doctor_present" : "doctor_not_found"),
+      path: projectPath,
+    }),
   );
 
   await Promise.all(AGENTS.map(async (agent) => {
     const effective = await resolveEffective({ workspace, agent });
     statusLine(
       "ok",
-      "設定",
-      `agent ${agent}: ${effective.engine} / ${effective.model ?? "engine default"}`,
+      category,
+      t(lang, "doctor_agent_config", {
+        agent,
+        engine: effective.engine,
+        model: effective.model ?? t(lang, "doctor_engine_default"),
+      }),
     );
   }));
 }
 
-async function inspectModelCatalogs(engines: EngineName[]): Promise<void> {
+async function inspectModelCatalogs(engines: EngineName[], lang: Lang): Promise<void> {
   const path = modelsCachePath();
   const document = await readCachedCatalogs(path);
+  const category = t(lang, "doctor_category_model_catalog");
   for (const engine of engines) {
     const catalog = cachedCatalog(document, engine);
     if (!catalog) {
-      statusLine("warn", "モデルカタログ", `${engine}: cache not found (${path})`);
+      statusLine("warn", category, t(lang, "doctor_cache_missing", { engine, path }));
       continue;
     }
 
     const stale = Date.now() - Date.parse(catalog.fetched_at as string) >= MODEL_CACHE_TTL_MS;
     statusLine(
       stale ? "warn" : "ok",
-      "モデルカタログ",
-      `${engine}: fetched_at=${catalog.fetched_at}, source=${catalog.source}${stale ? " (stale)" : ""}`,
+      category,
+      t(lang, "doctor_cache_detail", {
+        engine,
+        fetchedAt: catalog.fetched_at as string,
+        source: catalog.source as string,
+        stale: stale ? t(lang, "doctor_stale") : "",
+      }),
     );
   }
 }
@@ -214,27 +254,36 @@ async function expectedSkills(): Promise<string[]> {
   }
 }
 
-async function inspectClaudeAssets(): Promise<void> {
+async function inspectClaudeAssets(lang: Lang): Promise<void> {
   const root = claudeUserDir();
   const skills = await expectedSkills();
   const missingSkills = skills.filter((skill) => !existsSync(join(root, "skills", skill, "SKILL.md")));
+  const category = t(lang, "doctor_category_claude_assets");
   statusLine(
     missingSkills.length === 0 && skills.length > 0 ? "ok" : "warn",
-    "Claude Code資産",
+    category,
     missingSkills.length === 0 && skills.length > 0
-      ? `skills installed (${skills.length})`
-      : `skills incomplete${missingSkills.length > 0 ? `; missing ${missingSkills.join(", ")}` : ""}`,
+      ? t(lang, "doctor_skills_installed", { count: skills.length })
+      : t(lang, "doctor_skills_incomplete", {
+        missing: missingSkills.length > 0
+          ? t(lang, "doctor_missing_list", { items: missingSkills.join(", ") })
+          : "",
+      }),
   );
 
   const missingHooks = HOOK_FILES.filter((file) => !existsSync(join(root, "hooks", file)));
   statusLine(
     missingHooks.length === 0 ? "ok" : "warn",
-    "Claude Code資産",
-    missingHooks.length === 0 ? "hooks installed" : `hooks incomplete; missing ${missingHooks.join(", ")}`,
+    category,
+    missingHooks.length === 0
+      ? t(lang, "doctor_hooks_installed")
+      : t(lang, "doctor_hooks_incomplete", { items: missingHooks.join(", ") }),
   );
 
   const planner = existsSync(join(root, "agents", "planner.md"));
-  statusLine(planner ? "ok" : "warn", "Claude Code資産", `planner.md ${planner ? "installed" : "not installed"}`);
+  statusLine(planner ? "ok" : "warn", category, t(lang, "doctor_planner_state", {
+    state: t(lang, planner ? "doctor_installed" : "doctor_not_installed"),
+  }));
 
   let claudeText = "";
   try {
@@ -245,8 +294,10 @@ async function inspectClaudeAssets(): Promise<void> {
   const hasBlock = claudeText.includes(CLAUDE_BEGIN) && claudeText.includes(CLAUDE_END);
   statusLine(
     hasBlock ? "ok" : "warn",
-    "Claude Code資産",
-    `CLAUDE.md managed section ${hasBlock ? "installed" : "not installed"}`,
+    category,
+    t(lang, "doctor_claude_md_state", {
+      state: t(lang, hasBlock ? "doctor_installed" : "doctor_not_installed"),
+    }),
   );
 }
 
@@ -271,32 +322,39 @@ export async function shouldGateCommand(
 }
 
 export async function runDoctor(workspace: string, lang: Lang = "en"): Promise<number> {
-  void lang;
   const configPath = userConfigPath();
   const [user, project] = await Promise.all([
     loadUserConfig(configPath),
     loadProjectConfig(workspace),
   ]);
   const engines = enabledEngines(project, user);
-  let failures = await inspectEnvironment(workspace);
-  failures += await inspectEngines(workspace, engines);
-  await inspectConfig(workspace);
-  await inspectModelCatalogs(engines);
-  await inspectClaudeAssets();
+  let failures = await inspectEnvironment(workspace, lang);
+  failures += await inspectEngines(workspace, engines, lang);
+  await inspectConfig(workspace, lang);
+  await inspectModelCatalogs(engines, lang);
+  await inspectClaudeAssets(lang);
 
   statusLine(
     await isReady(configPath) ? "ok" : "warn",
-    "Ready",
-    `user config ready: ${formatReady(user.ready)}`,
+    t(lang, "doctor_category_ready"),
+    t(lang, "doctor_user_ready", { ready: formatReady(user.ready, lang) }),
   );
 
   if (failures > 0) {
-    statusLine("fail", "Ready", "required checks failed; ready was not updated");
+    statusLine(
+      "fail",
+      t(lang, "doctor_category_ready"),
+      t(lang, "doctor_required_checks_failed"),
+    );
     return 1;
   }
 
   const ready = { engine: "codex", checked_at: new Date().toISOString() };
   await saveUserConfig({ ...user, ready });
-  statusLine("ok", "Ready", `updated: ${formatReady(ready)}`);
+  statusLine(
+    "ok",
+    t(lang, "doctor_category_ready"),
+    t(lang, "doctor_ready_updated", { ready: formatReady(ready, lang) }),
+  );
   return 0;
 }

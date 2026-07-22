@@ -214,14 +214,26 @@ npm --prefix runner test
 npm pack --dry-run --prefix runner
 ```
 
-Publishing is driven by the GitHub Actions release workflow. Keep the tag equal to
-the package version (`v<version>`), create and push that tag, and configure the
-repository `NPM_TOKEN` secret:
+Version changes are managed from the private root npm workspace with
+`@changesets/cli`. Add a changeset for each user-facing change and select the
+appropriate version bump:
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+npx changeset
 ```
 
-The `v*` tag workflow verifies the tag/version match and runs `npm publish --access
-public` with `NPM_TOKEN`; normal development installs remain non-interactive.
+At release time, apply the accumulated changesets. This bumps
+`runner/package.json` and writes `runner/CHANGELOG.md`; commit those generated
+changes before tagging the release:
+
+```bash
+npx changeset version
+git add runner/package.json runner/CHANGELOG.md .changeset
+git commit -m "chore: release v<version>"
+git tag v<version>
+git push origin v<version>
+```
+
+The tag must exactly equal the bumped package version. The unchanged `v*` GitHub
+Actions workflow verifies that match and publishes `runner/` to npm with Trusted
+Publishing; normal development installs remain non-interactive.
