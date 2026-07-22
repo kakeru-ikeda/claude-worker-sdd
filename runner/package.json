@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test",
+    "test": "npm run build && cd dist && node --test",
     "copy-assets": "node scripts/copy-assets.mjs",
     "prepack": "npm run copy-assets && npm run build",
     "prepublishOnly": "npm run check && npm test"
