@@ -35,8 +35,9 @@ import {
 import { ensureDir, readText, readYaml, writeText, writeYaml } from "./fsutil.js";
 import { captureCommand, runShell } from "./shell.js";
 import { getModelCatalog } from "./models.js";
-import { countPlanTasks, findTaskBriefScript, findWorkspace, taskId } from "./plan.js";
+import { countPlanTasks, findWorkspace, taskId } from "./plan.js";
 import { runSetup } from "./setup.js";
+import { readyGateError, runDoctor, shouldGateCommand } from "./doctor.js";
 import type { AgentName, EngineName, Progress, TaskSpec } from "./types.js";
 
 const COMMAND_FLAGS: Record<string, readonly string[]> = {
@@ -327,6 +328,10 @@ async function run(argv: string[]): Promise<number> {
       );
     }
   }
+  if (await shouldGateCommand(command)) {
+    console.error(readyGateError());
+    return 1;
+  }
   const workspace = await findWorkspace();
   await migrateStateRoot(workspace);
 
@@ -364,28 +369,7 @@ async function run(argv: string[]): Promise<number> {
   }
 
   if (command === "doctor") {
-    const checks: Array<{ bin: string; note: string; required: boolean }> = [
-      { bin: "codex", note: "primary engine", required: true },
-      { bin: "opencode", note: "optional engine", required: false },
-      { bin: "git", note: "required for diff capture and commits", required: true },
-    ];
-    let failures = 0;
-    for (const { bin, note, required } of checks) {
-      const result = await captureCommand(bin, ["--version"], { cwd: workspace });
-      if (result.code === 0) {
-        console.log(`ok    ${bin}  ${result.stdout.trim().split("\n")[0]}`);
-      } else {
-        console.log(`${required ? "MISS" : "warn"}  ${bin}  (${note}) — not found or exits ${result.code}`);
-        if (required) failures += 1;
-      }
-    }
-    const brief = findTaskBriefScript();
-    console.log(
-      brief
-        ? `ok    superpowers task-brief: ${brief}`
-        : "warn  superpowers task-brief script not found — runner falls back to whole-plan briefs",
-    );
-    return failures > 0 ? 1 : 0;
+    return runDoctor(workspace);
   }
 
   if (command === "guide") {
