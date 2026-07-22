@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   publish:
@@ -43,8 +44,22 @@ jobs:
           }
           NODE
 
+      - name: Update npm for trusted publishing (OIDC)
+        run: npm install -g npm@latest
+
+      - name: Skip if version already published
+        id: check
+        working-directory: runner
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "sdd-worker@${VERSION}" version >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "sdd-worker@${VERSION} already on npm; skipping publish."
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish package
+        if: steps.check.outputs.published == 'false'
         working-directory: runner
         run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
