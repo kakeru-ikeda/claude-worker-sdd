@@ -123,22 +123,30 @@ export function lockPath(workspace: string, slug: string): string {
   return join(planRoot(workspace, slug), ".lock");
 }
 
+export function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error: unknown) {
+    // EPERM = the process exists but belongs to another user: still alive.
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+export async function isLockStale(workspace: string, slug: string): Promise<boolean> {
+  const path = lockPath(workspace, slug);
+  if (!existsSync(path)) return true;
+  const lock = await readYaml<{ pid?: number; task_id?: string; started_at?: string }>(path);
+  return !lock?.pid || !isPidAlive(lock.pid);
+}
+
 // Enforces the single-writer rule at the script level: one executor run per plan.
 // A lock whose pid is no longer alive is treated as stale and replaced.
 export async function acquireLock(workspace: string, slug: string, taskIdValue: string): Promise<void> {
   const path = lockPath(workspace, slug);
   if (existsSync(path)) {
     const lock = await readYaml<{ pid?: number; task_id?: string; started_at?: string }>(path);
-    let alive = false;
-    if (lock?.pid) {
-      try {
-        process.kill(lock.pid, 0);
-        alive = true;
-      } catch (error: unknown) {
-        // EPERM = the process exists but belongs to another user: still alive.
-        alive = (error as NodeJS.ErrnoException).code === "EPERM";
-      }
-    }
+    const alive = lock?.pid ? isPidAlive(lock.pid) : false;
     if (alive) {
       throw new Error(
         `another run is active for this plan (${lock.task_id ?? "?"}, pid ${lock.pid}, since ${lock.started_at ?? "?"}). ` +

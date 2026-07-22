@@ -6,6 +6,7 @@ import { getAdapter } from "./adapters/index.js";
 import {
   acquireLock,
   ensurePlanState,
+  isLockStale,
   loadCurrentPlan,
   loadProgressFor,
   migrateLegacyLayout,
@@ -276,6 +277,18 @@ async function run(argv: string[]): Promise<number> {
           console.log(`dry-run: ${taskId(i)} is marked running — 'next' will not dispatch while it is running`);
           return 0;
         }
+        if (await isLockStale(workspace, slug)) {
+          const item = progress.tasks[taskId(i)]!;
+          if (!item.attempts) item.attempts = [];
+          item.attempts.push({ type: "interrupted", detected_at: new Date().toISOString() });
+          item.status = "failed";
+          await saveProgress(workspace, slug, progress);
+          console.log(
+            `${taskId(i)} was marked running but its dispatch process is gone (stale lock) — recorded as interrupted, redispatching`,
+          );
+          nextIndex = i;
+          break;
+        }
         throw new Error(`${taskId(i)} is still running; wait for it before dispatching the next task`);
       }
       if (state !== "complete") {
@@ -378,6 +391,20 @@ async function run(argv: string[]): Promise<number> {
     if (progress.tasks[id]?.status === "complete") {
       console.log(`${id} already complete; skipping`);
       return 0;
+    }
+    if (progress.tasks[id]?.status === "running") {
+      if (await isLockStale(workspace, slug)) {
+        const item = progress.tasks[id]!;
+        if (!item.attempts) item.attempts = [];
+        item.attempts.push({ type: "interrupted", detected_at: new Date().toISOString() });
+        item.status = "failed";
+        await saveProgress(workspace, slug, progress);
+        console.log(
+          `${id} was marked running but its dispatch process is gone (stale lock) — recorded as interrupted, redispatching`,
+        );
+      } else {
+        throw new Error(`${id} is already running in another process; wait for it to finish`);
+      }
     }
 
     const isGitRepo = existsSync(join(workspace, ".git"));
