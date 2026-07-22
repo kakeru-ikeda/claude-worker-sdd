@@ -23,11 +23,11 @@ import {
 import { ensureDir, readText, readYaml, writeText, writeYaml } from "./fsutil.js";
 import { captureCommand, runShell } from "./shell.js";
 import { countPlanTasks, findTaskBriefScript, findWorkspace, taskId } from "./plan.js";
-import type { AgentName, EngineName, TaskSpec } from "./types.js";
+import type { AgentName, EngineName, Progress, TaskSpec } from "./types.js";
 
 const COMMAND_FLAGS: Record<string, readonly string[]> = {
-  run: ["task", "engine", "model", "agent", "verify", "net", "force"],
-  next: ["plan", "engine", "model", "agent", "verify", "net", "force"],
+  run: ["task", "engine", "model", "agent", "verify", "net", "force", "dry-run"],
+  next: ["plan", "engine", "model", "agent", "verify", "net", "force", "dry-run"],
   "one-shot": ["task", "engine", "model", "agent", "verify", "net", "force"],
   review: ["plan", "engine", "model"],
   retry: ["plan", "engine", "model", "net"],
@@ -105,6 +105,11 @@ function flagArgs(flags: Record<string, string | true>, keys: string[]): string[
   return out;
 }
 
+async function loadProgressReadOnly(workspace: string, slug: string): Promise<Progress | null> {
+  const path = progressPath(workspace, slug);
+  return existsSync(path) ? await readYaml<Progress>(path) : null;
+}
+
 async function resolveActivePlan(
   workspace: string,
   flags: Record<string, string | true>,
@@ -134,9 +139,10 @@ async function run(argv: string[]): Promise<number> {
   await migrateStateRoot(workspace);
 
   if (command === "help" || command === "--help") {
-    console.log("Usage: sdd-worker run <plan.md> [--task TASK-001] [--engine codex] [--model gpt-5.4] [--verify '<test cmd>'] [--net] [--force]");
+    console.log("Usage: sdd-worker run <plan.md> [--task TASK-001] [--engine codex] [--model gpt-5.4] [--verify '<test cmd>'] [--net] [--force] [--dry-run]");
+    console.log("       (--dry-run: preview the dispatch without locking or writing state)");
     console.log("       (--net: opt-in outbound network for that dispatch only; FS/.git protection stays)");
-    console.log("       sdd-worker next [<plan.md>] [--engine codex] [--model gpt-5.4]   dispatch first non-complete task");
+    console.log("       sdd-worker next [<plan.md>] [--engine codex] [--model gpt-5.4] [--dry-run]   dispatch first non-complete task");
     console.log("       (--verify persists as the plan default and gates every task's completion)");
     console.log("       sdd-worker one-shot \"<instruction>\" [--agent explorer] [--engine codex]");
     console.log("       sdd-worker review TASK-001 [--plan <plan.md>] [--engine codex] [--model gpt-5.5]");
@@ -257,11 +263,19 @@ async function run(argv: string[]): Promise<number> {
     if (total === null) {
       throw new Error("no task headings found in plan (expected '### Task N: ...'); use run --task instead");
     }
-    const { progress } = await ensurePlanState(workspace, planPath);
+    const dryRun = flags["dry-run"] === true;
+    const slug = planSlug(planPath);
+    const progress = dryRun
+      ? await loadProgressReadOnly(workspace, slug) ?? { plan: planPath, base_commit: null, tasks: {} }
+      : (await ensurePlanState(workspace, planPath)).progress;
     let nextIndex: number | null = null;
     for (let i = 1; i <= total; i += 1) {
       const state = progress.tasks[taskId(i)]?.status;
       if (state === "running") {
+        if (dryRun) {
+          console.log(`dry-run: ${taskId(i)} is marked running — 'next' will not dispatch while it is running`);
+          return 0;
+        }
         throw new Error(`${taskId(i)} is still running; wait for it before dispatching the next task`);
       }
       if (state !== "complete") {
@@ -273,13 +287,17 @@ async function run(argv: string[]): Promise<number> {
       console.log(`all ${total} tasks complete for ${planPath}`);
       return 0;
     }
-    console.log(`dispatching ${taskId(nextIndex)} (plan defines ${total} tasks)`);
+    if (dryRun) {
+      console.log(`dry-run: next task is ${taskId(nextIndex)} (plan defines ${total} tasks)`);
+    } else {
+      console.log(`dispatching ${taskId(nextIndex)} (plan defines ${total} tasks)`);
+    }
     return run([
       "run",
       planPath,
       "--task",
       taskId(nextIndex),
-      ...flagArgs(flags, ["engine", "model", "agent", "verify", "net", "force"]),
+      ...flagArgs(flags, ["engine", "model", "agent", "verify", "net", "force", "dry-run"]),
     ]);
   }
 
@@ -332,9 +350,31 @@ async function run(argv: string[]): Promise<number> {
     const agent = asAgent(flags.agent) ?? "executor";
     const model = typeof flags.model === "string" ? flags.model : undefined;
 
+    const id = taskId(index);
+    if (flags["dry-run"] === true) {
+      const slug = planSlug(planPath);
+      const progress = await loadProgressReadOnly(workspace, slug);
+      const state = progress?.tasks[id]?.status ?? "new";
+      const storedVerify =
+        progress?.defaults && typeof progress.defaults["verify_command"] === "string"
+          ? progress.defaults["verify_command"]
+          : undefined;
+      const verifyCommand = typeof flags.verify === "string" ? flags.verify : storedVerify;
+
+      console.log(`dry-run: would dispatch ${id} of ${planPath} (slug: ${slug})`);
+      console.log(`  engine=${engine} model=${model ?? "(adapter default)"} agent=${agent}`);
+      console.log(`  verify=${verifyCommand ?? "(none)"}`);
+      console.log(`  current status: ${state}`);
+      if (state === "complete") {
+        console.log("  real dispatch would skip this task because it is complete");
+      } else if (state === "running") {
+        console.log("  real dispatch would refuse because this task is already running");
+      }
+      return 0;
+    }
+
     const { slug, progress } = await ensurePlanState(workspace, planPath);
     await saveCurrentPlan(workspace, planPath, slug);
-    const id = taskId(index);
     if (progress.tasks[id]?.status === "complete") {
       console.log(`${id} already complete; skipping`);
       return 0;
