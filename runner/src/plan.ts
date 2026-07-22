@@ -35,6 +35,54 @@ export function findTaskBriefScript(): string | null {
   return null;
 }
 
+export function extractBriefSections(
+  planText: string,
+  index: number,
+): { preamble: string; taskSection: string | null; otherTaskTitles: string[] } {
+  const headingRe = /^(#{1,4})\s*(?:Task\s+(\d+)\b|TASK-(\d+)\b)(.*)$/gim;
+  const headings: Array<{
+    offset: number;
+    level: number;
+    number: number;
+    line: string;
+    title: string;
+  }> = [];
+
+  for (const match of planText.matchAll(headingRe)) {
+    const number = Number(match[2] ?? match[3]);
+    if (!Number.isFinite(number)) continue;
+
+    headings.push({
+      offset: match.index ?? 0,
+      level: match[1].length,
+      number,
+      line: match[0],
+      title: match[4].replace(/^\s*:\s*/, "").trim(),
+    });
+  }
+
+  const firstHeadingOffset = headings[0]?.offset;
+  const preamble = firstHeadingOffset === undefined
+    ? ""
+    : planText.slice(0, firstHeadingOffset).trim();
+  const selected = headings.find((heading) => heading.number === index);
+
+  let taskSection: string | null = null;
+  if (selected) {
+    const nextHeadingRe = new RegExp(`^#{1,${selected.level}}\\s`, "gm");
+    nextHeadingRe.lastIndex = selected.offset + selected.line.length;
+    const nextHeading = nextHeadingRe.exec(planText);
+    const end = nextHeading?.index ?? planText.length;
+    taskSection = planText.slice(selected.offset, end).trim();
+  }
+
+  const otherTaskTitles = headings
+    .filter((heading) => heading.number !== index)
+    .map((heading) => `${taskId(heading.number)}: ${heading.title}`);
+
+  return { preamble, taskSection, otherTaskTitles };
+}
+
 export async function writeBrief(input: {
   workspace: string;
   planPath: string;
@@ -51,6 +99,39 @@ export async function writeBrief(input: {
   }
 
   const plan = await readText(resolve(input.workspace, input.planPath));
+  const sections = extractBriefSections(plan, input.index);
+  if (sections.taskSection !== null) {
+    const otherTasks = sections.otherTaskTitles.length > 0
+      ? [
+          "",
+          "Other tasks in this plan (do NOT implement):",
+          ...sections.otherTaskTitles.map((title) => `- ${title}`),
+        ]
+      : [];
+
+    await writeText(
+      input.outPath,
+      [
+        `# ${taskId(input.index)} Brief`,
+        "",
+        `Source plan: ${input.planPath}`,
+        "",
+        "Optional external task-brief script was not found; this fallback brief is scoped to this task.",
+        "It contains the plan preamble (shared context) and this task's section ONLY.",
+        "Other tasks are listed by title for orientation and are OUT OF SCOPE — do not implement them.",
+        "",
+        "```md",
+        sections.preamble,
+        "",
+        sections.taskSection,
+        "```",
+        ...otherTasks,
+        "",
+      ].join("\n"),
+    );
+    return;
+  }
+
   await writeText(
     input.outPath,
     [
@@ -58,7 +139,7 @@ export async function writeBrief(input: {
       "",
       `Source plan: ${input.planPath}`,
       "",
-      "Optional external task-brief script was not found, so this fallback brief contains the whole plan.",
+      "Optional external task-brief script was not found, and the task heading could not be located; this fallback includes the whole plan as a last resort.",
       "The orchestrator should replace it with a scoped brief before production use.",
       "",
       "```md",
