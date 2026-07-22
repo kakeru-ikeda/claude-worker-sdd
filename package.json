@@ -1,0 +1,7 @@
+{
+  "name": "claude-worker-sdd-monorepo",
+  "private": true,
+  "workspaces": ["runner"],
+  "devDependencies": { "@changesets/cli": "^2.27.0" },
+  "scripts": { "changeset": "changeset", "version-packages": "changeset version" }
+}
