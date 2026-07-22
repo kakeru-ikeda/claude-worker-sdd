@@ -25,6 +25,21 @@ import { captureCommand, runShell } from "./shell.js";
 import { countPlanTasks, findTaskBriefScript, findWorkspace, taskId } from "./plan.js";
 import type { AgentName, EngineName, TaskSpec } from "./types.js";
 
+const COMMAND_FLAGS: Record<string, readonly string[]> = {
+  run: ["task", "engine", "model", "agent", "verify", "net", "force"],
+  next: ["plan", "engine", "model", "agent", "verify", "net", "force"],
+  "one-shot": ["task", "engine", "model", "agent", "verify", "net", "force"],
+  review: ["plan", "engine", "model"],
+  retry: ["plan", "engine", "model", "net"],
+  accept: ["plan", "note"],
+  set: ["plan"],
+  status: ["plan"],
+  help: [],
+  "--help": [],
+  guide: [],
+  doctor: [],
+};
+
 function parseArgs(argv: string[]): { command: string; rest: string[]; flags: Record<string, string | true> } {
   const [command = "help", ...raw] = argv;
   const rest: string[] = [];
@@ -106,6 +121,15 @@ async function resolveActivePlan(
 
 async function run(argv: string[]): Promise<number> {
   const { command, rest, flags } = parseArgs(argv);
+  if (command in COMMAND_FLAGS) {
+    const allowed = COMMAND_FLAGS[command];
+    const unknown = Object.keys(flags).find((key) => !allowed.includes(key));
+    if (unknown) {
+      throw new Error(
+        `unknown flag --${unknown} for command "${command}" (allowed: ${allowed.length ? allowed.map((key) => `--${key}`).join(", ") : "none"})`,
+      );
+    }
+  }
   const workspace = await findWorkspace();
   await migrateStateRoot(workspace);
 
