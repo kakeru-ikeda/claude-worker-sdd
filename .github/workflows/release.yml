@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish npm package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+          cache: npm
+          cache-dependency-path: runner/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefix runner
+
+      - name: Verify tag matches package version
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const pkg = JSON.parse(fs.readFileSync('runner/package.json', 'utf8'));
+          const expectedTag = `v${pkg.version}`;
+
+          if (process.env.TAG_NAME !== expectedTag) {
+            console.error(`Tag ${process.env.TAG_NAME} does not match package version ${expectedTag}`);
+            process.exit(1);
+          }
+          NODE
+
+      - name: Publish package
+        working-directory: runner
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
