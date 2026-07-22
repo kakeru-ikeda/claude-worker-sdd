@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { runCommand } from "./shell.js";
 import { readText, writeText } from "./fsutil.js";
@@ -23,7 +24,7 @@ export async function findWorkspace(start = process.cwd()): Promise<string> {
 
 export function findTaskBriefScript(): string | null {
   const candidates = [
-    join(process.env.HOME ?? "", ".claude/plugins/cache/claude-plugins-official/superpowers"),
+    join(homedir(), ".claude/plugins/cache/claude-plugins-official/superpowers"),
   ];
 
   // Treat the plugin script as an optional candidate; the runner has a

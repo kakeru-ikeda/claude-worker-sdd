@@ -8,7 +8,8 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "check": "tsc -p tsconfig.json --noEmit"
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test dist/test/*.test.js"
   },
   "dependencies": {
     "yaml": "^2.8.1"
@@ -18,4 +19,3 @@
     "typescript": "^5.8.0"
   }
 }
-
