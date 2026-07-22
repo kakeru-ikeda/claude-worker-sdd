@@ -95,6 +95,36 @@ export async function loadProjectConfig(workspace: string): Promise<SddConfig> {
   return (await readOptionalYaml(join(workspace, ".sdd", "config.yaml"))) as SddConfig;
 }
 
+const FORBIDDEN_PATH_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+function pathParts(path: string): string[] {
+  const parts = path.split(".").map((part) => part.trim());
+  if (parts.length === 0 || parts.some((part) => !part || FORBIDDEN_PATH_KEYS.has(part))) {
+    throw new Error(`invalid config path: ${path}`);
+  }
+  return parts;
+}
+
+export function getPath(object: unknown, path: string): unknown {
+  return pathParts(path).reduce<unknown>((current, part) => {
+    if (!current || typeof current !== "object" || Array.isArray(current)) return undefined;
+    return (current as Record<string, unknown>)[part];
+  }, object);
+}
+
+export function setPath(object: Record<string, unknown>, path: string, value: unknown): void {
+  const parts = pathParts(path);
+  let current: Record<string, unknown> = object;
+  for (const part of parts.slice(0, -1)) {
+    const child = current[part];
+    if (!child || typeof child !== "object" || Array.isArray(child)) {
+      current[part] = {};
+    }
+    current = current[part] as Record<string, unknown>;
+  }
+  current[parts[parts.length - 1]] = value;
+}
+
 function isEngineName(value: unknown): value is EngineName {
   return value === "codex" || value === "opencode" || value === "gemini";
 }

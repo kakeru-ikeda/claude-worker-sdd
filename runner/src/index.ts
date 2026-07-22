@@ -2,6 +2,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import YAML from "yaml";
 import { getAdapter } from "./adapters/index.js";
 import {
   acquireLock,
@@ -21,6 +22,16 @@ import {
   saveProgress,
   taskPathForProgress,
 } from "./artifacts.js";
+import {
+  getPath,
+  loadProjectConfig,
+  loadUserConfig,
+  resolveEffective,
+  saveUserConfig,
+  setPath,
+  type EffectiveEngine,
+  type SddConfig,
+} from "./config.js";
 import { ensureDir, readText, readYaml, writeText, writeYaml } from "./fsutil.js";
 import { captureCommand, runShell } from "./shell.js";
 import { countPlanTasks, findTaskBriefScript, findWorkspace, taskId } from "./plan.js";
@@ -34,6 +45,7 @@ const COMMAND_FLAGS: Record<string, readonly string[]> = {
   retry: ["plan", "engine", "model", "net"],
   accept: ["plan", "note"],
   set: ["plan"],
+  config: ["project"],
   status: ["plan"],
   help: [],
   "--help": [],
@@ -111,6 +123,145 @@ async function loadProgressReadOnly(workspace: string, slug: string): Promise<Pr
   return existsSync(path) ? await readYaml<Progress>(path) : null;
 }
 
+type ProgressTask = Progress["tasks"][string];
+
+function latestRunAttempt(item: ProgressTask | undefined): { engine?: EngineName; model?: string | null } | undefined {
+  const record = [...(item?.attempts ?? [])]
+    .reverse()
+    .find((attempt) => attempt.type === "run");
+  if (!record) return undefined;
+
+  const engine = asEngine(record.engine);
+  const model = typeof record.model === "string" || record.model === null ? record.model : undefined;
+  if (engine === undefined && model === undefined) return undefined;
+  return { engine, model };
+}
+
+async function loadStoredTask(
+  workspace: string,
+  item: ProgressTask | undefined,
+): Promise<TaskSpec | undefined> {
+  if (!item?.path) return undefined;
+  const path = join(workspace, item.path, "task.yaml");
+  if (!existsSync(path)) return undefined;
+  return readYaml<TaskSpec>(path);
+}
+
+function taskResolutionInput(task: TaskSpec | undefined): {
+  engine?: EngineName;
+  model?: string | null;
+  effort?: string | null;
+} | undefined {
+  if (!task) return undefined;
+  return {
+    engine: asEngine(task.engine?.name),
+    model: typeof task.engine?.model === "string" || task.engine?.model === null ? task.engine.model : undefined,
+    effort: typeof task.engine?.effort === "string" || task.engine?.effort === null ? task.engine.effort : undefined,
+  };
+}
+
+async function resolveDispatchEngine(input: {
+  workspace: string;
+  agent: AgentName;
+  flags: Record<string, string | true>;
+  task?: TaskSpec;
+  progressTask?: ProgressTask;
+}): Promise<EffectiveEngine> {
+  const cli: { engine?: EngineName; model?: string } = {};
+  if (typeof input.flags.engine === "string") cli.engine = asEngine(input.flags.engine);
+  if (typeof input.flags.model === "string") cli.model = input.flags.model;
+  return resolveEffective({
+    workspace: input.workspace,
+    agent: input.agent,
+    cli,
+    task: taskResolutionInput(input.task),
+    attempt: latestRunAttempt(input.progressTask),
+  });
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function mergeConfigValues(base: unknown, override: unknown): unknown {
+  if (!isObject(base) || !isObject(override)) return override;
+  const merged: Record<string, unknown> = { ...base };
+  for (const [key, value] of Object.entries(override)) {
+    merged[key] = key in merged ? mergeConfigValues(merged[key], value) : value;
+  }
+  return merged;
+}
+
+function flattenConfig(
+  value: unknown,
+  source: "user" | "project",
+  prefix = "",
+  entries = new Map<string, { value: unknown; source: "user" | "project" }>(),
+): Map<string, { value: unknown; source: "user" | "project" }> {
+  if (isObject(value) && Object.keys(value).length > 0) {
+    for (const [key, child] of Object.entries(value)) {
+      flattenConfig(child, source, prefix ? `${prefix}.${key}` : key, entries);
+    }
+  } else if (prefix) {
+    entries.set(prefix, { value, source });
+  }
+  return entries;
+}
+
+function displayConfigValue(value: unknown): string {
+  const rendered = YAML.stringify(value).trim();
+  return rendered.replace(/\n/g, " ") || "null";
+}
+
+async function runConfigCommand(
+  workspace: string,
+  rest: string[],
+  flags: Record<string, string | true>,
+): Promise<number> {
+  const [subcommand, path] = rest;
+  if (!subcommand || !["list", "get", "set"].includes(subcommand)) {
+    throw new Error("Usage: config list | config get <dotted.path> | config set <dotted.path> <value> [--project]");
+  }
+
+  const user = await loadUserConfig();
+  const project = await loadProjectConfig(workspace);
+
+  if (subcommand === "list") {
+    const entries = flattenConfig(user, "user");
+    flattenConfig(project, "project", "", entries);
+    if (entries.size === 0) {
+      console.log("No user or project config values are set.");
+      return 0;
+    }
+    for (const [key, entry] of [...entries.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+      console.log(`${key} = ${displayConfigValue(entry.value)} (${entry.source})`);
+    }
+    return 0;
+  }
+
+  if (!path) throw new Error(`Usage: config ${subcommand} <dotted.path>${subcommand === "set" ? " <value>" : ""}`);
+  if (subcommand === "get") {
+    const value = getPath(mergeConfigValues(user, project), path);
+    if (value === undefined) throw new Error(`config path not found: ${path}`);
+    console.log(displayConfigValue(value));
+    return 0;
+  }
+
+  const rawValue = rest.slice(2).join(" ");
+  if (!rawValue) throw new Error("config set requires a value");
+  const value = YAML.parse(rawValue);
+  const target = flags.project === true ? project : user;
+  setPath(target as unknown as Record<string, unknown>, path, value);
+  if (flags.project === true) {
+    await writeYaml(join(workspace, ".sdd", "config.yaml"), target);
+    console.log(`set ${path} in project config`);
+  } else {
+    await saveUserConfig(target as SddConfig);
+    console.log(`set ${path} in user config`);
+  }
+  return 0;
+}
+
 async function resolveActivePlan(
   workspace: string,
   flags: Record<string, string | true>,
@@ -151,9 +302,14 @@ async function run(argv: string[]): Promise<number> {
     console.log("       sdd-worker accept TASK-001 [--note \"why\"]              mark a failed task complete after manual review");
     console.log("       sdd-worker status [--plan <plan.md>]");
     console.log("       sdd-worker set <TASK-ID> engine|model <value> [--plan <plan.md>]");
+    console.log("       sdd-worker config list|get <dotted.path>|set <dotted.path> <value> [--project]");
     console.log("       sdd-worker guide [<topic>]                    print playbook section on demand");
     console.log("       sdd-worker doctor                             check engine CLIs (setup debugging only)");
     return 0;
+  }
+
+  if (command === "config") {
+    return runConfigCommand(workspace, rest, flags);
   }
 
   if (command === "doctor") {
@@ -359,14 +515,20 @@ async function run(argv: string[]): Promise<number> {
       );
     }
 
-    const engine = asEngine(flags.engine) ?? "codex";
-    const agent = asAgent(flags.agent) ?? "executor";
-    const model = typeof flags.model === "string" ? flags.model : undefined;
-
     const id = taskId(index);
     if (flags["dry-run"] === true) {
       const slug = planSlug(planPath);
       const progress = await loadProgressReadOnly(workspace, slug);
+      const progressTask = progress?.tasks[id];
+      const storedTask = await loadStoredTask(workspace, progressTask);
+      const agent = asAgent(flags.agent) ?? storedTask?.agent ?? progressTask?.agent ?? "executor";
+      const resolved = await resolveDispatchEngine({
+        workspace,
+        agent,
+        flags,
+        task: storedTask,
+        progressTask,
+      });
       const state = progress?.tasks[id]?.status ?? "new";
       const storedVerify =
         progress?.defaults && typeof progress.defaults["verify_command"] === "string"
@@ -375,7 +537,7 @@ async function run(argv: string[]): Promise<number> {
       const verifyCommand = typeof flags.verify === "string" ? flags.verify : storedVerify;
 
       console.log(`dry-run: would dispatch ${id} of ${planPath} (slug: ${slug})`);
-      console.log(`  engine=${engine} model=${model ?? "(adapter default)"} agent=${agent}`);
+      console.log(`  engine=${resolved.engine} model=${resolved.model ?? "(adapter default)"} agent=${agent}`);
       console.log(`  verify=${verifyCommand ?? "(none)"}`);
       console.log(`  current status: ${state}`);
       if (state === "complete") {
@@ -407,6 +569,19 @@ async function run(argv: string[]): Promise<number> {
       }
     }
 
+    const previousTaskState = progress.tasks[id];
+    const storedTask = await loadStoredTask(workspace, previousTaskState);
+    const agent = asAgent(flags.agent) ?? storedTask?.agent ?? previousTaskState?.agent ?? "executor";
+    const resolved = await resolveDispatchEngine({
+      workspace,
+      agent,
+      flags,
+      task: storedTask,
+      progressTask: previousTaskState,
+    });
+    const engine = resolved.engine;
+    const model = resolved.model ?? undefined;
+
     const isGitRepo = existsSync(join(workspace, ".git"));
     if (!progress.base_commit && isGitRepo) {
       const head = await captureCommand("git", ["rev-parse", "HEAD"], { cwd: workspace });
@@ -435,11 +610,11 @@ async function run(argv: string[]): Promise<number> {
         engine,
         model,
         agent,
+        resolved,
         verifyCommand,
         net: flags.net === true,
       });
 
-      const previousTaskState = progress.tasks[id];
       progress.tasks[id] = {
         status: "running",
         engine: task.engine.name,
@@ -642,13 +817,13 @@ async function run(argv: string[]): Promise<number> {
     const item = progress.tasks[id];
     if (!item) throw new Error(`${id} not found in progress.yaml`);
     item.status = "needs_retry";
-    const engine = asEngine(flags.engine) ?? item.engine ?? "codex";
-    const model = typeof flags.model === "string" ? flags.model : item.model ?? undefined;
     const agent = item.agent ?? "executor";
+    const engine = typeof flags.engine === "string" ? asEngine(flags.engine) : undefined;
+    const model = typeof flags.model === "string" ? flags.model : undefined;
     if (!item.attempts) item.attempts = [];
     item.attempts.push({
       type: "retry_requested",
-      engine,
+      engine: engine ?? null,
       model: model ?? null,
       requested_at: new Date().toISOString(),
     });
@@ -658,8 +833,7 @@ async function run(argv: string[]): Promise<number> {
       progress.plan,
       "--task",
       id,
-      "--engine",
-      engine,
+      ...(engine ? ["--engine", engine] : []),
       ...(model ? ["--model", model] : []),
       "--agent",
       agent,
@@ -676,9 +850,21 @@ async function run(argv: string[]): Promise<number> {
     if (!item) throw new Error(`${id} not found in progress.yaml`);
     const taskDir = join(workspace, item.path);
     const task = await readYaml<TaskSpec>(join(taskDir, "task.yaml"));
-    const engine = asEngine(flags.engine) ?? item.engine ?? task.engine.name;
-    const model = typeof flags.model === "string" ? flags.model : undefined;
-    const { reviewTask, dispatchPath } = await prepareReview({ workspace, task, taskDir, engine, model });
+    // Reviewer must not inherit the executor's task.yaml/attempt model —
+    // only CLI flags and config layers apply to a review dispatch.
+    const resolved = await resolveDispatchEngine({
+      workspace,
+      agent: "reviewer",
+      flags,
+    });
+    const { reviewTask, dispatchPath } = await prepareReview({
+      workspace,
+      task,
+      taskDir,
+      engine: resolved.engine,
+      model: resolved.model ?? undefined,
+      resolved,
+    });
     if (!item.attempts) item.attempts = [];
     const attemptNumber = item.attempts.length + 1;
     const attemptSlug = String(attemptNumber).padStart(3, "0") + "-review-" + reviewTask.engine.name + (reviewTask.engine.model ? "-" + reviewTask.engine.model : "");

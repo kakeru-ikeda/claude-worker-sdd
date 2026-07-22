@@ -2,11 +2,10 @@ import { existsSync } from "node:fs";
 import { rename, rm, rmdir } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { EffectiveEngine } from "./config.js";
 import type { AgentName, EngineName, Progress, TaskSpec } from "./types.js";
 import { ensureDir, readYaml, writeText, writeYaml } from "./fsutil.js";
 import { defaultTitle, taskDirName, taskId, writeBrief } from "./plan.js";
-
-const DEFAULT_ENGINE: EngineName = "codex";
 
 // Schemas ship with the runner, not with the consumer repo: resolve them
 // relative to this module (dist/artifacts.js -> repo root -> sdd/schemas).
@@ -185,6 +184,7 @@ export async function prepareTask(input: {
   engine?: EngineName;
   model?: string;
   agent?: AgentName;
+  resolved: EffectiveEngine;
   verifyCommand?: string;
   net?: boolean;
 }): Promise<{ task: TaskSpec; taskDir: string; dispatchPath: string }> {
@@ -207,11 +207,11 @@ export async function prepareTask(input: {
     source_task_index: input.index,
     agent: input.agent ?? "executor",
     engine: {
-      name: input.engine ?? DEFAULT_ENGINE,
-      runner: input.engine === "opencode" ? "run" : "exec",
-      model: input.model ?? (input.engine === "codex" || !input.engine ? "gpt-5.6-luna" : null),
-      effort: input.engine === "codex" || !input.engine ? "xhigh" : null,
-      agent: input.engine === "opencode" ? input.agent ?? "executor" : null,
+      name: input.resolved.engine,
+      runner: input.resolved.engine === "opencode" ? "run" : "exec",
+      model: input.resolved.model,
+      effort: input.resolved.effort,
+      agent: input.resolved.engine === "opencode" ? input.agent ?? "executor" : null,
     },
     worktree: { enabled: false, base: null, path: null },
     ...(input.net ? { network: true } : {}),
@@ -273,16 +273,17 @@ export async function prepareReview(input: {
   taskDir: string;
   engine?: EngineName;
   model?: string;
+  resolved: EffectiveEngine;
 }): Promise<{ reviewTask: TaskSpec; dispatchPath: string }> {
   const reviewTask: TaskSpec = {
     ...input.task,
     agent: "reviewer",
     engine: {
-      name: input.engine ?? input.task.engine.name,
-      runner: input.engine === "opencode" ? "run" : "exec",
-      model: input.model ?? (input.engine === "codex" || !input.engine ? "gpt-5.6-sol" : null),
-      effort: input.engine === "codex" || !input.engine ? "medium" : null,
-      agent: input.engine === "opencode" ? "reviewer" : null,
+      name: input.resolved.engine,
+      runner: input.resolved.engine === "opencode" ? "run" : "exec",
+      model: input.resolved.model,
+      effort: input.resolved.effort,
+      agent: input.resolved.engine === "opencode" ? "reviewer" : null,
     },
   };
 
