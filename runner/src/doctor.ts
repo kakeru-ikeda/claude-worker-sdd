@@ -129,7 +129,7 @@ async function inspectEnvironment(workspace: string): Promise<number> {
     "環境",
     brief
       ? `Superpowers task-brief ${brief}`
-      : "Superpowers task-brief not found; using the built-in fallback",
+      : "Superpowers task-brief script not found (removed in Superpowers 6.x; built-in fallback is used — this is normal)",
   );
   return failures;
 }

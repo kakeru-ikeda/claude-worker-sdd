@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { runCommand } from "./shell.js";
@@ -22,8 +22,25 @@ export async function findWorkspace(start = process.cwd()): Promise<string> {
   }
 }
 
-export function findTaskBriefScript(): string | null {
-  const candidates = [
+const SEMVER_DIRECTORY = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+
+function compareSemverDescending(left: string, right: string): number {
+  const [leftCore, leftPrerelease] = left.split("+", 1)[0].split("-", 2);
+  const [rightCore, rightPrerelease] = right.split("+", 1)[0].split("-", 2);
+  const leftParts = leftCore.split(".").map(Number);
+  const rightParts = rightCore.split(".").map(Number);
+
+  for (let index = 0; index < 3; index += 1) {
+    const difference = (rightParts[index] ?? 0) - (leftParts[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  if (leftPrerelease === undefined && rightPrerelease !== undefined) return -1;
+  if (leftPrerelease !== undefined && rightPrerelease === undefined) return 1;
+  return (rightPrerelease ?? "").localeCompare(leftPrerelease ?? "", undefined, { numeric: true });
+}
+
+export function findTaskBriefScript(pluginRoots?: string[]): string | null {
+  const candidates = pluginRoots ?? [
     join(homedir(), ".claude/plugins/cache/claude-plugins-official/superpowers"),
   ];
 
@@ -32,6 +49,21 @@ export function findTaskBriefScript(): string | null {
   for (const root of candidates) {
     const direct = join(root, "scripts/task-brief");
     if (existsSync(direct)) return direct;
+
+    let versions: string[] = [];
+    try {
+      versions = readdirSync(root, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory() && SEMVER_DIRECTORY.test(entry.name))
+        .map((entry) => entry.name)
+        .sort(compareSemverDescending);
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+
+    for (const version of versions) {
+      const versioned = join(root, version, "scripts/task-brief");
+      if (existsSync(versioned)) return versioned;
+    }
   }
   return null;
 }

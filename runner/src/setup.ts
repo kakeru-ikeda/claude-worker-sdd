@@ -1,6 +1,12 @@
 import { checkbox, confirm, input, select } from "@inquirer/prompts";
 import type { AgentName, EngineName } from "./types.js";
-import { installAll } from "./claude-assets.js";
+import {
+  appendClaudeMdTemplate,
+  installHooks,
+  installPlannerAgent,
+  installSkills,
+  type ClaudeMdInstallMode,
+} from "./claude-assets.js";
 import {
   loadUserConfig,
   saveUserConfig,
@@ -27,6 +33,17 @@ const DEFAULTS: Record<AgentName, { model: string; effort: string }> = {
   reviewer: { model: "gpt-5.6-sol", effort: "medium" },
   thinker: { model: "gpt-5.6-sol", effort: "medium" },
 };
+
+const AGENT_DESCRIPTIONS: Record<AgentName, string> = {
+  executor: "実装・修正の主担当 (推奨: gpt-5.6-luna xhigh)",
+  explorer: "読み取り専用のコード調査 (推奨: gpt-5.6-luna)",
+  operator: "シェル・Git操作",
+  "test-writer": "TDDのテスト先行作成 (テストファイルのみ)",
+  reviewer: "diffの二次レビュー (推奨: gpt-5.6-sol medium)",
+  thinker: "設計・計画の批評 (読み取り専用、推奨: gpt-5.6-sol)",
+};
+
+const EFFORTS = ["minimal", "low", "medium", "high", "xhigh"] as const;
 
 const CUSTOM_MODEL = "__sdd_worker_custom_model__";
 
@@ -66,6 +83,31 @@ function modelChoices(models: string[], current: string): PromptChoice<string>[]
   ];
 }
 
+function effortChoices(current: string): PromptChoice<string>[] {
+  const values = [...EFFORTS];
+  if (current && !values.includes(current as (typeof EFFORTS)[number])) {
+    return [
+      ...values.map((effort) => ({ name: effort, value: effort })),
+      { name: current, value: current, description: "currently configured" },
+    ];
+  }
+  return values.map((effort) => ({
+    name: effort,
+    value: effort,
+    description: effort === current ? "currently configured" : undefined,
+  }));
+}
+
+export function saveAgentSelection(
+  config: SddConfig,
+  agent: AgentName,
+  model: string,
+  effort: string,
+): void {
+  config.agents ??= {};
+  config.agents[agent] = { ...config.agents[agent], model, effort };
+}
+
 async function configureAgents(config: SddConfig, models: string[]): Promise<void> {
   config.agents ??= {};
 
@@ -74,7 +116,7 @@ async function configureAgents(config: SddConfig, models: string[]): Promise<voi
     const defaults = DEFAULTS[agent];
     const currentModel = existing.model ?? defaults.model;
     const selectedModel = await select({
-      message: `${agent} のモデル`,
+      message: `${agent}: ${AGENT_DESCRIPTIONS[agent]}\nモデルを選択`,
       choices: modelChoices(models, currentModel),
       default: currentModel,
     });
@@ -86,14 +128,64 @@ async function configureAgents(config: SddConfig, models: string[]): Promise<voi
           validate: (value) => value.trim().length > 0 || "モデル名を入力してください",
         })
       : selectedModel;
-    const effort = await input({
+    const currentEffort = existing.effort ?? defaults.effort;
+    const effort = await select({
       message: `${agent} の effort`,
-      default: existing.effort ?? defaults.effort,
-      required: true,
-      validate: (value) => value.trim().length > 0 || "effort を入力してください",
+      choices: effortChoices(currentEffort),
+      default: currentEffort,
     });
 
-    config.agents[agent] = { ...existing, model, effort };
+    saveAgentSelection(config, agent, model, effort);
+  }
+}
+
+async function configureClaudeAssets(): Promise<void> {
+  const targetDir = claudeUserDir();
+
+  if (await confirm({
+    message: "スキルを ~/.claude/skills にインストールする？ (worker-sdd等、SDD運用に必須)",
+    default: true,
+  })) {
+    await installSkills(targetDir);
+    console.log("スキルを更新しました。");
+  }
+
+  if (await confirm({
+    message: "hooksとsettings.json統合を行う？ (Superpowers実装系skillのブロックとSDD境界の自動表示)",
+    default: true,
+  })) {
+    await installHooks(targetDir);
+    console.log("hooksとsettings.jsonを更新しました。");
+  }
+
+  if (await confirm({
+    message: "plannerエージェント定義を ~/.claude/agents に置く？",
+    default: true,
+  })) {
+    await installPlannerAgent(targetDir);
+    console.log("plannerエージェント定義を更新しました。");
+  }
+
+  if (await confirm({
+    message: "CLAUDE.mdにSDD設定を反映する？",
+    default: true,
+  })) {
+    const mode = await select<ClaudeMdInstallMode | "skip">({
+      message: "CLAUDE.mdの反映方法",
+      choices: [
+        {
+          name: "マーカーブロックを追記/更新 (既存内容保持・推奨)",
+          value: "marker",
+        },
+        { name: "ファイル全体を上書き", value: "overwrite" },
+        { name: "スキップ", value: "skip" },
+      ],
+      default: "marker",
+    });
+    if (mode !== "skip") {
+      await appendClaudeMdTemplate(targetDir, mode);
+      console.log("CLAUDE.mdを更新しました。");
+    }
   }
 }
 
@@ -148,17 +240,7 @@ export async function runSetup(workspace: string): Promise<number> {
   console.log(`モデルカタログ: ${catalog.source} (${catalog.models.length} 件)`);
   await configureAgents(config, catalog.models);
 
-  const install = await confirm({
-    message: "Claude Code 連携資産をインストールしますか？",
-    default: true,
-  });
-  if (install) {
-    const result = await installAll(claudeUserDir());
-    console.log("Claude Code 連携資産を更新しました:");
-    for (const action of result.actions) console.log(`  ${action}`);
-  } else {
-    console.log("Claude Code 連携資産のインストールをスキップしました。");
-  }
+  await configureClaudeAssets();
 
   // Persist the choices before checking the executable so a failed setup can
   // be resumed with the values just entered. A failed check must not leave a

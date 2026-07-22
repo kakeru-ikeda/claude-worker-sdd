@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, test } from "node:test";
 import { assetPath } from "../paths.js";
-import { installAll } from "../claude-assets.js";
+import { appendClaudeMdTemplate, installAll } from "../claude-assets.js";
 
 const temporaryDirectories: string[] = [];
 
@@ -95,6 +95,17 @@ test("the Node hook is a standalone Node asset with the expected blocked skills"
   assert.match(hook, /^#!\/usr\/bin\/env node/);
   assert.match(hook, /superpowers:executing-plans/);
   assert.match(hook, /process\.exitCode = 2/);
+});
+
+test("appendClaudeMdTemplate overwrite mode replaces the whole file with the template", async () => {
+  const targetDir = await temporaryDirectory();
+  await writeFile(join(targetDir, "CLAUDE.md"), "# Existing guidance\n");
+
+  await appendClaudeMdTemplate(targetDir, "overwrite");
+
+  const expected = `${(await readFile(assetPath("claude", "CLAUDE.md"), "utf8")).trimEnd()}\n`;
+  assert.equal(await readFile(join(targetDir, "CLAUDE.md"), "utf8"), expected);
+  assert.doesNotMatch(expected, /sdd-worker:begin/);
 });
 
 test("the SessionStart hook prints the adjacent SDD boundary asset", async () => {

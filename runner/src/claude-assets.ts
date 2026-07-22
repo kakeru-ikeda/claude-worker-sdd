@@ -120,9 +120,22 @@ export async function installPlannerAgent(targetDir = claudeUserDir()): Promise<
   await cp(source, destination);
 }
 
-export async function appendClaudeMdTemplate(targetDir = claudeUserDir()): Promise<void> {
+export type ClaudeMdInstallMode = "marker" | "overwrite";
+
+export async function appendClaudeMdTemplate(
+  targetDir = claudeUserDir(),
+  mode: ClaudeMdInstallMode = "marker",
+): Promise<void> {
   const source = assetPath("claude", "CLAUDE.md");
   const destination = join(targetDir, "CLAUDE.md");
+  const template = (await readFile(source, "utf8")).trimEnd();
+
+  if (mode === "overwrite") {
+    await ensureDir(targetDir);
+    await writeFile(destination, `${template}\n`, "utf8");
+    return;
+  }
+
   let existing = "";
   try {
     existing = await readFile(destination, "utf8");
@@ -130,7 +143,6 @@ export async function appendClaudeMdTemplate(targetDir = claudeUserDir()): Promi
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
 
-  const template = (await readFile(source, "utf8")).trimEnd();
   const block = `${CLAUDE_BEGIN}\n${template}\n${CLAUDE_END}`;
   const markerBlock = new RegExp(`${escapeRegExp(CLAUDE_BEGIN)}[\\s\\S]*?${escapeRegExp(CLAUDE_END)}`);
   const content = markerBlock.test(existing)
