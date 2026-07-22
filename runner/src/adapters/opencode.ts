@@ -1,4 +1,4 @@
-import { runCommand } from "../shell.js";
+import { captureCommand, runCommand } from "../shell.js";
 import type { EngineAdapter } from "./base.js";
 
 export const opencodeAdapter: EngineAdapter = {
@@ -23,5 +23,11 @@ export const opencodeAdapter: EngineAdapter = {
 
     return { exitCode, command: ["opencode", ...args].join(" ") };
   },
-};
+  async listModels() {
+    const result = await captureCommand("opencode", ["models"], { cwd: process.cwd() });
+    if (result.code !== 0) return null;
 
+    const models = [...new Set(result.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean))];
+    return { models, source: "cli" as const };
+  },
+};

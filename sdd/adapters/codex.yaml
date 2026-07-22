@@ -15,4 +15,12 @@ defaults:
   approval: never
 command:
   run: codex exec
-
+models:
+  - gpt-5.6-luna
+  - gpt-5.6-sol
+  - gpt-5.6-terra
+  - gpt-5.5
+  - gpt-5.4
+  - gpt-5.4-mini
+  - codex-auto-review
+models_updated: "2026-07-22"

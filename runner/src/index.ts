@@ -34,6 +34,7 @@ import {
 } from "./config.js";
 import { ensureDir, readText, readYaml, writeText, writeYaml } from "./fsutil.js";
 import { captureCommand, runShell } from "./shell.js";
+import { getModelCatalog } from "./models.js";
 import { countPlanTasks, findTaskBriefScript, findWorkspace, taskId } from "./plan.js";
 import type { AgentName, EngineName, Progress, TaskSpec } from "./types.js";
 
@@ -51,6 +52,7 @@ const COMMAND_FLAGS: Record<string, readonly string[]> = {
   "--help": [],
   guide: [],
   doctor: [],
+  models: ["engine", "refresh"],
 };
 
 function parseArgs(argv: string[]): { command: string; rest: string[]; flags: Record<string, string | true> } {
@@ -262,6 +264,42 @@ async function runConfigCommand(
   return 0;
 }
 
+function configuredEngines(value: unknown): EngineName[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const engines = value.filter((item): item is EngineName => asEngine(item) !== undefined);
+  return engines.length > 0 ? [...new Set(engines)] : [];
+}
+
+async function enabledModelEngines(workspace: string): Promise<EngineName[]> {
+  const [project, user] = await Promise.all([loadProjectConfig(workspace), loadUserConfig()]);
+  return configuredEngines(project.adapters?.enabled) ??
+    configuredEngines(user.adapters?.enabled) ??
+    ["codex", "opencode"];
+}
+
+async function runModelsCommand(
+  workspace: string,
+  flags: Record<string, string | true>,
+): Promise<number> {
+  const requested = typeof flags.engine === "string" ? asEngine(flags.engine) : undefined;
+  if (typeof flags.engine === "string" && !requested) {
+    throw new Error(`unknown engine: ${flags.engine}`);
+  }
+
+  const engines = requested ? [requested] : await enabledModelEngines(workspace);
+  for (const [index, engine] of engines.entries()) {
+    if (index > 0) console.log("");
+    const catalog = await getModelCatalog(engine, { refresh: flags.refresh === true });
+    console.log(`engine: ${engine}`);
+    console.log(`source: ${catalog.source}`);
+    console.log(`fetched_at: ${catalog.fetched_at}`);
+    console.log("models:");
+    if (catalog.models.length === 0) console.log("  (none)");
+    else for (const model of catalog.models) console.log(`  - ${model}`);
+  }
+  return 0;
+}
+
 async function resolveActivePlan(
   workspace: string,
   flags: Record<string, string | true>,
@@ -305,11 +343,16 @@ async function run(argv: string[]): Promise<number> {
     console.log("       sdd-worker config list|get <dotted.path>|set <dotted.path> <value> [--project]");
     console.log("       sdd-worker guide [<topic>]                    print playbook section on demand");
     console.log("       sdd-worker doctor                             check engine CLIs (setup debugging only)");
+    console.log("       sdd-worker models [--engine codex] [--refresh] list available models");
     return 0;
   }
 
   if (command === "config") {
     return runConfigCommand(workspace, rest, flags);
+  }
+
+  if (command === "models") {
+    return runModelsCommand(workspace, flags);
   }
 
   if (command === "doctor") {
