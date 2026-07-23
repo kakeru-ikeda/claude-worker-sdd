@@ -8,6 +8,6 @@ const assetsRoot = join(runnerRoot, "assets");
 
 await rm(assetsRoot, { recursive: true, force: true });
 
-for (const assetName of ["sdd", "skills", "claude"]) {
+for (const assetName of ["sdd", "skills", "claude", "ja"]) {
   await cp(join(repositoryRoot, assetName), join(assetsRoot, assetName), { recursive: true });
 }
