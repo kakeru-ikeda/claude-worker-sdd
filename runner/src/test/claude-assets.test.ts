@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, test } from "node:test";
 import { assetPath } from "../paths.js";
-import { appendClaudeMdTemplate, installAll } from "../claude-assets.js";
+import { appendClaudeMdTemplate, installAll, installHooks } from "../claude-assets.js";
 
 const temporaryDirectories: string[] = [];
 
@@ -87,6 +87,76 @@ test("installAll is idempotent and preserves existing settings and CLAUDE.md con
     ).length,
     1,
   );
+});
+
+test("installAll installs Japanese localized assets when lang is ja", async () => {
+  const targetDir = await temporaryDirectory();
+
+  await installAll(targetDir, "ja");
+
+  const localizedAssets = [
+    {
+      destination: ["skills", "worker-sdd", "SKILL.md"],
+      source: ["ja", "skills", "worker-sdd", "SKILL.md"],
+    },
+    {
+      destination: ["agents", "planner.md"],
+      source: ["ja", "claude", "agents", "planner.md"],
+    },
+    {
+      destination: ["hooks", "sdd-boundary.md"],
+      source: ["ja", "claude", "hooks", "sdd-boundary.md"],
+    },
+  ];
+  for (const { destination, source } of localizedAssets) {
+    const actual = await readFile(join(targetDir, ...destination), "utf8");
+    const expected = await readFile(assetPath(...source), "utf8");
+    assert.equal(actual, expected);
+    assert.match(actual, /[ぁ-んァ-ヶ一-龠]/);
+  }
+
+  const claudeMd = await readFile(join(targetDir, "CLAUDE.md"), "utf8");
+  const template = (await readFile(assetPath("ja", "claude", "CLAUDE.md"), "utf8")).trimEnd();
+  assert.ok(claudeMd.includes(template));
+  assert.match(claudeMd, /[ぁ-んァ-ヶ一-龠]/);
+});
+
+test("installHooks keeps executable hook assets language-independent", async () => {
+  const targetDir = await temporaryDirectory();
+
+  await installHooks(targetDir, "ja");
+
+  for (const file of ["deny-superpowers-exec.mjs", "print-sdd-boundary.mjs"]) {
+    const actual = await readFile(join(targetDir, "hooks", file), "utf8");
+    const expected = await readFile(assetPath("claude", "hooks", file), "utf8");
+    assert.equal(actual, expected);
+  }
+});
+
+test("installAll defaults to English assets when lang is omitted", async () => {
+  const targetDir = await temporaryDirectory();
+
+  await installAll(targetDir);
+
+  const englishAssets = [
+    {
+      destination: ["skills", "worker-sdd", "SKILL.md"],
+      source: ["skills", "worker-sdd", "SKILL.md"],
+    },
+    {
+      destination: ["agents", "planner.md"],
+      source: ["claude", "agents", "planner.md"],
+    },
+    {
+      destination: ["hooks", "sdd-boundary.md"],
+      source: ["claude", "hooks", "sdd-boundary.md"],
+    },
+  ];
+  for (const { destination, source } of englishAssets) {
+    const actual = await readFile(join(targetDir, ...destination), "utf8");
+    const expected = await readFile(assetPath(...source), "utf8");
+    assert.equal(actual, expected);
+  }
 });
 
 test("the Node hook is a standalone Node asset with the expected blocked skills", async () => {

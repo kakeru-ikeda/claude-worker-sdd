@@ -150,7 +150,7 @@ async function configureClaudeAssets(lang: Lang): Promise<void> {
     message: t(lang, "setup_install_skills_confirm"),
     default: true,
   })) {
-    await installSkills(targetDir);
+    await installSkills(targetDir, lang);
     console.log(t(lang, "setup_install_skills_success"));
   }
 
@@ -158,7 +158,7 @@ async function configureClaudeAssets(lang: Lang): Promise<void> {
     message: t(lang, "setup_install_hooks_confirm"),
     default: true,
   })) {
-    await installHooks(targetDir);
+    await installHooks(targetDir, lang);
     console.log(t(lang, "setup_install_hooks_success"));
   }
 
@@ -166,7 +166,7 @@ async function configureClaudeAssets(lang: Lang): Promise<void> {
     message: t(lang, "setup_install_planner_confirm"),
     default: true,
   })) {
-    await installPlannerAgent(targetDir);
+    await installPlannerAgent(targetDir, lang);
     console.log(t(lang, "setup_install_planner_success"));
   }
 
@@ -187,7 +187,7 @@ async function configureClaudeAssets(lang: Lang): Promise<void> {
       default: "marker",
     });
     if (mode !== "skip") {
-      await appendClaudeMdTemplate(targetDir, mode);
+      await appendClaudeMdTemplate(targetDir, mode, lang);
       console.log(t(lang, "setup_claude_md_success"));
     }
   }
