@@ -2,8 +2,9 @@
 
 Claude Code is the orchestrator: it owns requirements, plans, diff review, commits,
 and user-facing decisions. Implementation work is dispatched to external worker
-engines via the `sdd-worker` CLI (installed on PATH by `npm link`; see the
-claude-worker-sdd repo's AGENTS.md). The runner enforces the mechanics — per-plan
+engines via the `sdd-worker` CLI (installed on PATH via `npm install -g sdd-worker`;
+see the claude-worker-sdd repo's README for local-dev setup via `npm link`). The
+runner enforces the mechanics — per-plan
 state, task numbering, locking, verify gates — and **prints the next action after
 every run: follow those printed hints.** Details are retrieved on demand with
 `sdd-worker guide <topic>` (run `sdd-worker guide` to list topics); never load the

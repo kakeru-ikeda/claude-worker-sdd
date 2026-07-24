@@ -5,6 +5,7 @@ import { test } from "node:test";
 import {
   assetPath,
   claudeUserDir,
+  localizedAssetPath,
   modelsCachePath,
   packageRoot,
   userConfigDir,
@@ -46,4 +47,30 @@ test("user config helper paths are rooted in userConfigDir", () => {
 test("assetPath falls back to the repository root when an asset is not packaged", () => {
   const segments = ["sdd", "agents", "__missing_task_001_asset__.yaml"];
   assert.equal(assetPath(...segments), join(packageRoot(), "..", ...segments));
+});
+
+test("localizedAssetPath uses the default asset for English", () => {
+  assert.equal(
+    localizedAssetPath("en", "claude", "CLAUDE.md"),
+    assetPath("claude", "CLAUDE.md"),
+  );
+});
+
+test("localizedAssetPath uses an existing Japanese asset", () => {
+  assert.equal(
+    localizedAssetPath("ja", "claude", "CLAUDE.md"),
+    assetPath("ja", "claude", "CLAUDE.md"),
+  );
+});
+
+test("localizedAssetPath falls back to the default asset when Japanese is missing", () => {
+  assert.equal(
+    localizedAssetPath(
+      "ja",
+      "claude",
+      "hooks",
+      "print-sdd-boundary.mjs",
+    ),
+    assetPath("claude", "hooks", "print-sdd-boundary.mjs"),
+  );
 });
