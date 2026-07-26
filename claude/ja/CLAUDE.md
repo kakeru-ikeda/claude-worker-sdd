@@ -1,4 +1,4 @@
-# Claude Code SDD 設定
+# Claude Code SDD (Spec-Driven Development / 仕様駆動開発) 設定
 
 Claude Code はオーケストレーターです。要件、計画、差分レビュー、コミット、
 ユーザー向けの意思決定を担います。実装作業は `sdd-worker` CLI

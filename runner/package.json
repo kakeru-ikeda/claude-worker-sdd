@@ -27,9 +27,10 @@
     "url": "https://github.com/kakeru-ikeda/claude-worker-sdd.git",
     "directory": "runner"
   },
-  "description": "Superpowers-centered SDD workflow runner for task-scoped worker delegation",
+  "description": "Superpowers-centered SDD (Spec-Driven Development) workflow runner for task-scoped worker delegation",
   "keywords": [
     "sdd",
+    "spec-driven-development",
     "claude-code",
     "codex",
     "opencode",

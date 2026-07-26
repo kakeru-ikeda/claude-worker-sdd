@@ -1,6 +1,8 @@
 # claude-worker-sdd
 
-Claude Codeをオーケストレーター、外部CLIエージェントをsubagent workerとして使うSuperpowers SDDワークフロー。
+Superpowers ベースの SDD (Spec-Driven Development / 仕様駆動開発) ワークフロー。
+Claude Code をオーケストレーターとし、承認済みの仕様・計画にもとづく実装を外部 CLI
+エージェントへワーカーとして委譲します。
 
 ## Install and first run
 
