@@ -49,21 +49,21 @@ test("assetPath falls back to the repository root when an asset is not packaged"
   assert.equal(assetPath(...segments), join(packageRoot(), "..", ...segments));
 });
 
-test("localizedAssetPath uses the default asset for English", () => {
+test("localizedAssetPath uses the colocated English asset", () => {
   assert.equal(
     localizedAssetPath("en", "claude", "CLAUDE.md"),
-    assetPath("claude", "CLAUDE.md"),
+    assetPath("claude", "en", "CLAUDE.md"),
   );
 });
 
-test("localizedAssetPath uses an existing Japanese asset", () => {
+test("localizedAssetPath uses the colocated Japanese asset", () => {
   assert.equal(
     localizedAssetPath("ja", "claude", "CLAUDE.md"),
-    assetPath("ja", "claude", "CLAUDE.md"),
+    assetPath("claude", "ja", "CLAUDE.md"),
   );
 });
 
-test("localizedAssetPath falls back to the default asset when Japanese is missing", () => {
+test("localizedAssetPath falls back to a language-independent asset", () => {
   assert.equal(
     localizedAssetPath(
       "ja",

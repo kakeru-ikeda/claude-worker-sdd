@@ -40,9 +40,11 @@ export function assetPath(...segs: string[]): string {
 }
 
 export function localizedAssetPath(lang: Lang, ...segs: string[]): string {
-  if (lang === "ja") {
-    const jaPath = assetPath("ja", ...segs);
-    if (existsSync(jaPath)) return jaPath;
-  }
-  return assetPath(...segs);
+  if (segs.length === 0) return assetPath();
+
+  const localizedPath = assetPath(...segs.slice(0, -1), lang, segs.at(-1) as string);
+  if (existsSync(localizedPath)) return localizedPath;
+
+  const englishPath = assetPath(...segs.slice(0, -1), "en", segs.at(-1) as string);
+  return existsSync(englishPath) ? englishPath : assetPath(...segs);
 }

@@ -97,15 +97,15 @@ test("installAll installs Japanese localized assets when lang is ja", async () =
   const localizedAssets = [
     {
       destination: ["skills", "worker-sdd", "SKILL.md"],
-      source: ["ja", "skills", "worker-sdd", "SKILL.md"],
+      source: ["skills", "worker-sdd", "ja", "SKILL.md"],
     },
     {
       destination: ["agents", "planner.md"],
-      source: ["ja", "claude", "agents", "planner.md"],
+      source: ["claude", "agents", "ja", "planner.md"],
     },
     {
       destination: ["hooks", "sdd-boundary.md"],
-      source: ["ja", "claude", "hooks", "sdd-boundary.md"],
+      source: ["claude", "hooks", "ja", "sdd-boundary.md"],
     },
   ];
   for (const { destination, source } of localizedAssets) {
@@ -116,7 +116,7 @@ test("installAll installs Japanese localized assets when lang is ja", async () =
   }
 
   const claudeMd = await readFile(join(targetDir, "CLAUDE.md"), "utf8");
-  const template = (await readFile(assetPath("ja", "claude", "CLAUDE.md"), "utf8")).trimEnd();
+  const template = (await readFile(assetPath("claude", "ja", "CLAUDE.md"), "utf8")).trimEnd();
   assert.ok(claudeMd.includes(template));
   assert.match(claudeMd, /[ぁ-んァ-ヶ一-龠]/);
 });
@@ -141,15 +141,15 @@ test("installAll defaults to English assets when lang is omitted", async () => {
   const englishAssets = [
     {
       destination: ["skills", "worker-sdd", "SKILL.md"],
-      source: ["skills", "worker-sdd", "SKILL.md"],
+      source: ["skills", "worker-sdd", "en", "SKILL.md"],
     },
     {
       destination: ["agents", "planner.md"],
-      source: ["claude", "agents", "planner.md"],
+      source: ["claude", "agents", "en", "planner.md"],
     },
     {
       destination: ["hooks", "sdd-boundary.md"],
-      source: ["claude", "hooks", "sdd-boundary.md"],
+      source: ["claude", "hooks", "en", "sdd-boundary.md"],
     },
   ];
   for (const { destination, source } of englishAssets) {
@@ -173,14 +173,14 @@ test("appendClaudeMdTemplate overwrite mode replaces the whole file with the tem
 
   await appendClaudeMdTemplate(targetDir, "overwrite");
 
-  const expected = `${(await readFile(assetPath("claude", "CLAUDE.md"), "utf8")).trimEnd()}\n`;
+  const expected = `${(await readFile(assetPath("claude", "en", "CLAUDE.md"), "utf8")).trimEnd()}\n`;
   assert.equal(await readFile(join(targetDir, "CLAUDE.md"), "utf8"), expected);
   assert.doesNotMatch(expected, /sdd-worker:begin/);
 });
 
 test("the SessionStart hook prints the adjacent SDD boundary asset", async () => {
   const printerPath = assetPath("claude", "hooks", "print-sdd-boundary.mjs");
-  const boundaryPath = assetPath("claude", "hooks", "sdd-boundary.md");
+  const boundaryPath = assetPath("claude", "hooks", "en", "sdd-boundary.md");
   const printer = await readFile(printerPath, "utf8");
   const expected = await readFile(boundaryPath, "utf8");
 
