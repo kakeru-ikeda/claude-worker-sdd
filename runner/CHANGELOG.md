@@ -1,5 +1,12 @@
 # sdd-worker
 
+## 0.4.1
+
+### Patch Changes
+
+- ba21b3d: Fix `sdd-worker guide` failing with "playbook not found" when installed globally via `npm install -g sdd-worker`. `docs/ORCHESTRATION.md` is now packaged as an asset and resolved through the same `assetPath` helper used for other shipped assets, instead of a relative path that assumed the monorepo's directory layout.
+- 215831d: `sdd-worker setup` now lets you explicitly choose the model for the `planner` Claude Code subagent (opus/fable/sonnet/haiku or a custom name), stored as `planner.model` in the user config and written into the installed `planner.md` agent's `model:` frontmatter. Defaults to `opus`. Previously the planner's model selection relied on an implicit "Fable if available, else fall back" prompt-controlled behavior described only in CLAUDE.md.
+
 ## 0.4.0
 
 ### Minor Changes
