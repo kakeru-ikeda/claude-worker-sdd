@@ -1,7 +1,7 @@
 # sdd-worker
 
 `sdd-worker` dispatches task-scoped work to Codex, OpenCode, and future engines
-using a Superpowers-centered software development workflow.
+using a Superpowers-centered SDD (Spec-Driven Development) workflow.
 
 ## Install
 

@@ -1,6 +1,6 @@
 # AGENTS.md - Setup Guide for Claude Code
 
-This repository installs a Superpowers-centered SDD workflow that can dispatch task-scoped work to Codex, OpenCode, and future engines.
+This repository installs a Superpowers-centered SDD (Spec-Driven Development) workflow that can dispatch task-scoped work to Codex, OpenCode, and future engines.
 
 ## What This Repo Provides
 

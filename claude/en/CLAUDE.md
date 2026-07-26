@@ -1,4 +1,4 @@
-# Claude Code SDD Configuration
+# Claude Code SDD (Spec-Driven Development) Configuration
 
 Claude Code is the orchestrator: it owns requirements, plans, diff review, commits,
 and user-facing decisions. Implementation work is dispatched to external worker
