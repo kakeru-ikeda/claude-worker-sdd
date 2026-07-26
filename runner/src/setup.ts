@@ -2,6 +2,7 @@ import { checkbox, confirm, input, select } from "@inquirer/prompts";
 import type { AgentName, EngineName } from "./types.js";
 import {
   appendClaudeMdTemplate,
+  DEFAULT_PLANNER_MODEL,
   installHooks,
   installPlannerAgent,
   installSkills,
@@ -45,6 +46,8 @@ const AGENT_DESCRIPTION_KEYS: Record<AgentName, MessageKey> = {
 };
 
 const EFFORTS = ["minimal", "low", "medium", "high", "xhigh"] as const;
+
+const PLANNER_MODELS = ["opus", "fable", "sonnet", "haiku"];
 
 const CUSTOM_MODEL = "__sdd_worker_custom_model__";
 
@@ -143,7 +146,27 @@ async function configureAgents(config: SddConfig, models: string[], lang: Lang):
   }
 }
 
-async function configureClaudeAssets(lang: Lang): Promise<void> {
+async function configurePlannerModel(config: SddConfig, lang: Lang): Promise<string> {
+  const current = config.planner?.model ?? DEFAULT_PLANNER_MODEL;
+  const selectedModel = await select({
+    message: t(lang, "setup_planner_model_prompt"),
+    choices: modelChoices(PLANNER_MODELS, current, lang),
+    default: current,
+  });
+  const model = selectedModel === CUSTOM_MODEL
+    ? await input({
+        message: t(lang, "setup_custom_model_prompt", { agent: "planner" }),
+        default: current,
+        required: true,
+        validate: (value) => value.trim().length > 0 || t(lang, "setup_custom_model_required"),
+      })
+    : selectedModel;
+
+  config.planner = { ...(config.planner ?? {}), model };
+  return model;
+}
+
+async function configureClaudeAssets(config: SddConfig, lang: Lang): Promise<void> {
   const targetDir = claudeUserDir();
 
   if (await confirm({
@@ -166,7 +189,8 @@ async function configureClaudeAssets(lang: Lang): Promise<void> {
     message: t(lang, "setup_install_planner_confirm"),
     default: true,
   })) {
-    await installPlannerAgent(targetDir, lang);
+    const plannerModel = await configurePlannerModel(config, lang);
+    await installPlannerAgent(targetDir, lang, plannerModel);
     console.log(t(lang, "setup_install_planner_success"));
   }
 
@@ -242,7 +266,7 @@ export async function runSetup(workspace: string, lang: Lang = "en"): Promise<nu
   console.log(t(lang, "setup_model_catalog", { source: catalog.source, count: catalog.models.length }));
   await configureAgents(config, catalog.models, lang);
 
-  await configureClaudeAssets(lang);
+  await configureClaudeAssets(config, lang);
 
   // Persist the choices before checking the executable so a failed setup can
   // be resumed with the values just entered. A failed check must not leave a
