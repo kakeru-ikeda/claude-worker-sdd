@@ -13,6 +13,7 @@ export interface AgentModelConfig {
 export interface SddConfig {
   adapters?: { enabled?: string[] };
   agents?: Partial<Record<AgentName, AgentModelConfig>>;
+  planner?: { model?: string };
   ready?: { engine: string; checked_at: string } | null;
 }
 

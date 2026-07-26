@@ -15,13 +15,14 @@ whole playbook into context.
 **Layer 1: Claude Code subagents** (native Agent tool, Claude models, spends your
 context budget):
 
-- `planner` — writes plan documents to disk on a Fable-class model when available
-  (frontmatter `model: fable`; Claude Code silently falls back to the session model
-  if the org lacks access). The user can pick a model per dispatch — pass the Agent
-  tool's `model` parameter (e.g. "planはopusで" → `model: "opus"`), which overrides
-  the frontmatter. Returns only the file path + task list. Use for any non-trivial
-  design. It starts with zero
-  conversation context: always pass it the explorer findings and the user's
+- `planner` — writes plan documents to disk. Its default model is explicitly
+  configured via `sdd-worker setup` (stored as `planner.model` in the user config;
+  written into the agent's `model:` frontmatter — defaults to `fable`, not an
+  implicit fallback). The user can still override per dispatch — pass the Agent
+  tool's `model` parameter (e.g. "planはopusで" → `model: "opus"`), which takes
+  precedence over the configured frontmatter for that one dispatch only. Returns
+  only the file path + task list. Use for any non-trivial design. It starts with
+  zero conversation context: always pass it the explorer findings and the user's
   requirements explicitly. Never author or transcribe the plan yourself.
 - Built-in read-only agents (Explore) — one-off codebase questions only.
 

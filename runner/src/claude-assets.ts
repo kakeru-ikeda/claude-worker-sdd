@@ -125,14 +125,20 @@ export async function installHooks(
   await writeFile(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
 }
 
+export const DEFAULT_PLANNER_MODEL = "fable";
+
 export async function installPlannerAgent(
   targetDir = claudeUserDir(),
   lang: Lang = "en",
+  model: string = DEFAULT_PLANNER_MODEL,
 ): Promise<void> {
   const source = localizedAssetPath(lang, "claude", "agents", "planner.md");
   const destination = join(targetDir, "agents", "planner.md");
   await ensureDir(join(targetDir, "agents"));
-  await cp(source, destination);
+
+  const template = await readFile(source, "utf8");
+  const content = template.replace(/^model:\s*.+$/m, `model: ${model}`);
+  await writeFile(destination, content, "utf8");
 }
 
 export type ClaudeMdInstallMode = "marker" | "overwrite";
@@ -178,10 +184,11 @@ function escapeRegExp(value: string): string {
 export async function installAll(
   targetDir = claudeUserDir(),
   lang: Lang = "en",
+  plannerModel: string = DEFAULT_PLANNER_MODEL,
 ): Promise<{ actions: string[] }> {
   await installSkills(targetDir, lang);
   await installHooks(targetDir, lang);
-  await installPlannerAgent(targetDir, lang);
+  await installPlannerAgent(targetDir, lang, plannerModel);
   await appendClaudeMdTemplate(targetDir, "marker", lang);
 
   return {

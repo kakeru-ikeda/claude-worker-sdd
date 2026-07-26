@@ -4,7 +4,12 @@ import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, test } from "node:test";
 import { assetPath } from "../paths.js";
-import { appendClaudeMdTemplate, installAll, installHooks } from "../claude-assets.js";
+import {
+  appendClaudeMdTemplate,
+  installAll,
+  installHooks,
+  installPlannerAgent,
+} from "../claude-assets.js";
 
 const temporaryDirectories: string[] = [];
 
@@ -188,6 +193,25 @@ test("the SessionStart hook prints the adjacent SDD boundary asset", async () =>
   assert.match(printer, /sdd-boundary\.md/);
   assert.match(printer, /process\.stdout\.write/);
   assert.ok(expected.includes("<SDD-BOUNDARY"));
+});
+
+test("installPlannerAgent writes the configured model into the agent frontmatter", async () => {
+  const targetDir = await temporaryDirectory();
+
+  await installPlannerAgent(targetDir, "en", "opus");
+
+  const planner = await readFile(join(targetDir, "agents", "planner.md"), "utf8");
+  assert.match(planner, /^model: opus$/m);
+  assert.doesNotMatch(planner, /^model: fable$/m);
+});
+
+test("installPlannerAgent defaults to fable when no model is given", async () => {
+  const targetDir = await temporaryDirectory();
+
+  await installPlannerAgent(targetDir, "en");
+
+  const planner = await readFile(join(targetDir, "agents", "planner.md"), "utf8");
+  assert.match(planner, /^model: fable$/m);
 });
 
 async function readJson(path: string): Promise<Record<string, any>> {
