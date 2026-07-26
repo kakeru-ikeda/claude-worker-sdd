@@ -47,7 +47,7 @@ const AGENT_DESCRIPTION_KEYS: Record<AgentName, MessageKey> = {
 
 const EFFORTS = ["minimal", "low", "medium", "high", "xhigh"] as const;
 
-const PLANNER_MODELS = ["fable", "opus", "sonnet", "haiku"];
+const PLANNER_MODELS = ["opus", "fable", "sonnet", "haiku"];
 
 const CUSTOM_MODEL = "__sdd_worker_custom_model__";
 

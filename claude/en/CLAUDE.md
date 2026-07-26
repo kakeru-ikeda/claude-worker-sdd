@@ -17,8 +17,9 @@ context budget):
 
 - `planner` — writes plan documents to disk. Its default model is explicitly
   configured via `sdd-worker setup` (stored as `planner.model` in the user config;
-  written into the agent's `model:` frontmatter — defaults to `fable`, not an
-  implicit fallback). The user can still override per dispatch — pass the Agent
+  written into the agent's `model:` frontmatter — defaults to `opus`, not an
+  implicit fallback; pick `fable` there if your org has access to it). The user
+  can still override per dispatch — pass the Agent
   tool's `model` parameter (e.g. "planはopusで" → `model: "opus"`), which takes
   precedence over the configured frontmatter for that one dispatch only. Returns
   only the file path + task list. Use for any non-trivial design. It starts with

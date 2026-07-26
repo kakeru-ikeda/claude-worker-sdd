@@ -198,20 +198,20 @@ test("the SessionStart hook prints the adjacent SDD boundary asset", async () =>
 test("installPlannerAgent writes the configured model into the agent frontmatter", async () => {
   const targetDir = await temporaryDirectory();
 
-  await installPlannerAgent(targetDir, "en", "opus");
+  await installPlannerAgent(targetDir, "en", "fable");
 
   const planner = await readFile(join(targetDir, "agents", "planner.md"), "utf8");
-  assert.match(planner, /^model: opus$/m);
-  assert.doesNotMatch(planner, /^model: fable$/m);
+  assert.match(planner, /^model: fable$/m);
+  assert.doesNotMatch(planner, /^model: opus$/m);
 });
 
-test("installPlannerAgent defaults to fable when no model is given", async () => {
+test("installPlannerAgent defaults to opus when no model is given", async () => {
   const targetDir = await temporaryDirectory();
 
   await installPlannerAgent(targetDir, "en");
 
   const planner = await readFile(join(targetDir, "agents", "planner.md"), "utf8");
-  assert.match(planner, /^model: fable$/m);
+  assert.match(planner, /^model: opus$/m);
 });
 
 async function readJson(path: string): Promise<Record<string, any>> {

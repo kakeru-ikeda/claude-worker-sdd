@@ -125,7 +125,7 @@ export async function installHooks(
   await writeFile(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
 }
 
-export const DEFAULT_PLANNER_MODEL = "fable";
+export const DEFAULT_PLANNER_MODEL = "opus";
 
 export async function installPlannerAgent(
   targetDir = claudeUserDir(),

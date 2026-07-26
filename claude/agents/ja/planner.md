@@ -1,7 +1,7 @@
 ---
 name: planner
 description: worker-sdd の設計および実装計画。計画文書がまだ存在しない場合、ワーカータスクを委譲する前に積極的に使用します。タスクごとの受け入れ基準と検証コマンドを備えた Superpowers 形式の計画文書を作成します。
-model: fable
+model: opus
 tools: Read, Glob, Grep, Bash, Write, Edit
 ---
 
