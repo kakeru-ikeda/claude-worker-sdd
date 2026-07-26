@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { existsSync, realpathSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 import { getAdapter } from "./adapters/index.js";
@@ -36,6 +36,7 @@ import { ensureDir, readText, readYaml, writeText, writeYaml } from "./fsutil.js
 import { captureCommand, runShell } from "./shell.js";
 import { getModelCatalog } from "./models.js";
 import { countPlanTasks, findWorkspace, taskId } from "./plan.js";
+import { assetPath } from "./paths.js";
 import { runSetup } from "./setup.js";
 import { readyGateError, runDoctor, shouldGateCommand } from "./doctor.js";
 import type { AgentName, EngineName, Progress, TaskSpec } from "./types.js";
@@ -380,8 +381,7 @@ async function run(argv: string[]): Promise<number> {
   }
 
   if (command === "guide") {
-    const here = dirname(fileURLToPath(import.meta.url));
-    const docPath = join(here, "..", "..", "docs", "ORCHESTRATION.md");
+    const docPath = assetPath("docs", "ORCHESTRATION.md");
     if (!existsSync(docPath)) throw new Error(`playbook not found: ${docPath}`);
     const sections = (await readText(docPath))
       .split(/^## /m)

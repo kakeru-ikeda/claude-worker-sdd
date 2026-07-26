@@ -1,4 +1,4 @@
-import { cp, rm } from "node:fs/promises";
+import { cp, mkdir, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,3 +11,10 @@ await rm(assetsRoot, { recursive: true, force: true });
 for (const assetName of ["sdd", "skills", "claude"]) {
   await cp(join(repositoryRoot, assetName), join(assetsRoot, assetName), { recursive: true });
 }
+
+const docsAssetsRoot = join(assetsRoot, "docs");
+await mkdir(docsAssetsRoot, { recursive: true });
+await cp(
+  join(repositoryRoot, "docs", "ORCHESTRATION.md"),
+  join(docsAssetsRoot, "ORCHESTRATION.md"),
+);
