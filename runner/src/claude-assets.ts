@@ -1,7 +1,8 @@
 import { cp, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { assetPath, claudeUserDir } from "./paths.js";
+import { assetPath, claudeUserDir, localizedAssetPath } from "./paths.js";
 import { ensureDir } from "./fsutil.js";
+import type { Lang } from "./i18n.js";
 
 const CLAUDE_BEGIN = "<!-- sdd-worker:begin -->";
 const CLAUDE_END = "<!-- sdd-worker:end -->";
@@ -59,7 +60,10 @@ function ensureHookCommand(
   return normalized;
 }
 
-export async function installSkills(targetDir = claudeUserDir()): Promise<void> {
+export async function installSkills(
+  targetDir = claudeUserDir(),
+  lang: Lang = "en",
+): Promise<void> {
   const sourceRoot = assetPath("skills");
   const entries = await readdir(sourceRoot, { withFileTypes: true });
 
@@ -67,7 +71,7 @@ export async function installSkills(targetDir = claudeUserDir()): Promise<void> 
     entries
       .filter((entry) => entry.isDirectory())
       .map(async (entry) => {
-        const source = join(sourceRoot, entry.name, "SKILL.md");
+        const source = localizedAssetPath(lang, "skills", entry.name, "SKILL.md");
         const destination = join(targetDir, "skills", entry.name, "SKILL.md");
         await ensureDir(join(targetDir, "skills", entry.name));
         await cp(source, destination);
@@ -75,12 +79,20 @@ export async function installSkills(targetDir = claudeUserDir()): Promise<void> 
   );
 }
 
-export async function installHooks(targetDir = claudeUserDir()): Promise<void> {
+export async function installHooks(
+  targetDir = claudeUserDir(),
+  lang: Lang = "en",
+): Promise<void> {
   const hooksDir = join(targetDir, "hooks");
   await ensureDir(hooksDir);
   await Promise.all(
     [HOOK_FILE, BOUNDARY_FILE, BOUNDARY_PRINTER_FILE].map((file) =>
-      cp(assetPath("claude", "hooks", file), join(hooksDir, file)),
+      cp(
+        file === BOUNDARY_FILE
+          ? localizedAssetPath(lang, "claude", "hooks", file)
+          : assetPath("claude", "hooks", file),
+        join(hooksDir, file),
+      ),
     ),
   );
 
@@ -113,8 +125,11 @@ export async function installHooks(targetDir = claudeUserDir()): Promise<void> {
   await writeFile(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
 }
 
-export async function installPlannerAgent(targetDir = claudeUserDir()): Promise<void> {
-  const source = assetPath("claude", "agents", "planner.md");
+export async function installPlannerAgent(
+  targetDir = claudeUserDir(),
+  lang: Lang = "en",
+): Promise<void> {
+  const source = localizedAssetPath(lang, "claude", "agents", "planner.md");
   const destination = join(targetDir, "agents", "planner.md");
   await ensureDir(join(targetDir, "agents"));
   await cp(source, destination);
@@ -125,8 +140,9 @@ export type ClaudeMdInstallMode = "marker" | "overwrite";
 export async function appendClaudeMdTemplate(
   targetDir = claudeUserDir(),
   mode: ClaudeMdInstallMode = "marker",
+  lang: Lang = "en",
 ): Promise<void> {
-  const source = assetPath("claude", "CLAUDE.md");
+  const source = localizedAssetPath(lang, "claude", "CLAUDE.md");
   const destination = join(targetDir, "CLAUDE.md");
   const template = (await readFile(source, "utf8")).trimEnd();
 
@@ -159,11 +175,14 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export async function installAll(targetDir = claudeUserDir()): Promise<{ actions: string[] }> {
-  await installSkills(targetDir);
-  await installHooks(targetDir);
-  await installPlannerAgent(targetDir);
-  await appendClaudeMdTemplate(targetDir);
+export async function installAll(
+  targetDir = claudeUserDir(),
+  lang: Lang = "en",
+): Promise<{ actions: string[] }> {
+  await installSkills(targetDir, lang);
+  await installHooks(targetDir, lang);
+  await installPlannerAgent(targetDir, lang);
+  await appendClaudeMdTemplate(targetDir, "marker", lang);
 
   return {
     actions: [

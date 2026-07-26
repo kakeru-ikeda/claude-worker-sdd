@@ -228,7 +228,7 @@ Spend tokens disproportionately at the plan stage:
 
 - Run the Explorer → Thinker pipeline before writing the plan.
 - Delegate design/plan drafting to the strongest available model via a Claude Code
-  subagent (see `claude/agents/planner.md`, `model: opus`). Planning tokens are paid
+  subagent (see `claude/agents/{en,ja}/planner.md`, `model: opus`). Planning tokens are paid
   once; implementation cost multiplies by plan quality. Feed the subagent the
   explorer's findings — it starts with no conversation context.
 - Every plan task must state: files to touch, files NOT to touch, acceptance

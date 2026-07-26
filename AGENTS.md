@@ -4,12 +4,12 @@ This repository installs a Superpowers-centered SDD workflow that can dispatch t
 
 ## What This Repo Provides
 
-- `claude/CLAUDE.md` - Claude Code orchestration guidance (two-layer delegation, iron rules).
-- `claude/agents/planner.md` - Opus-class plan-drafting subagent definition.
+- `claude/{en,ja}/CLAUDE.md` - localized Claude Code orchestration guidance (two-layer delegation, iron rules).
+- `claude/agents/{en,ja}/planner.md` - localized Opus-class plan-drafting subagent definitions.
 - `claude/hooks/` - SessionStart boundary injection + PreToolUse block of Superpowers' execution chain.
-- `skills/ask-worker/SKILL.md` - one-shot worker delegation.
-- `skills/worker-sdd/SKILL.md` - Superpowers SDD loop backed by the runner.
-- `skills/sdd-worker/SKILL.md` - engine-neutral worker control commands.
+- `skills/ask-worker/{en,ja}/SKILL.md` - localized one-shot worker delegation.
+- `skills/worker-sdd/{en,ja}/SKILL.md` - localized Superpowers SDD loop backed by the runner.
+- `skills/sdd-worker/{en,ja}/SKILL.md` - localized engine-neutral worker control commands.
 - `sdd/agents/*.yaml` - engine-independent agent role contracts.
 - `sdd/adapters/*.yaml` - engine capabilities and command templates.
 - `sdd/schemas/*.schema.json` - YAML/JSON contract schemas (resolved from the runner install).
@@ -72,11 +72,14 @@ after review.
 
 #### Install Claude skills
 
+Choose `en` or `ja`, then install that locale:
+
 ```bash
+lang=en
 for skill in skills/*/; do
   name=$(basename "$skill")
   mkdir -p "$HOME/.claude/skills/$name"
-  cp "$skill/SKILL.md" "$HOME/.claude/skills/$name/SKILL.md"
+  cp "$skill/$lang/SKILL.md" "$HOME/.claude/skills/$name/SKILL.md"
   echo "Installed: $name"
 done
 ```
@@ -85,7 +88,7 @@ done
 
 ```bash
 mkdir -p ~/.claude/agents
-cp claude/agents/planner.md ~/.claude/agents/planner.md
+cp "claude/agents/$lang/planner.md" ~/.claude/agents/planner.md
 ```
 
 `planner` runs on an Opus-class model and drafts worker-ready plan documents
@@ -100,7 +103,7 @@ hook prints the SDD boundary, and the `PreToolUse` hook blocks
 
 ```bash
 mkdir -p ~/.claude/hooks
-cp claude/hooks/sdd-boundary.md \
+cp "claude/hooks/$lang/sdd-boundary.md" \
   claude/hooks/deny-superpowers-exec.mjs \
   claude/hooks/print-sdd-boundary.mjs ~/.claude/hooks/
 ```
@@ -126,10 +129,10 @@ Do not overwrite an existing `~/.claude/CLAUDE.md` automatically. If missing, co
 
 ```bash
 if [ ! -f ~/.claude/CLAUDE.md ]; then
-  cp claude/CLAUDE.md ~/.claude/CLAUDE.md
+  cp "claude/$lang/CLAUDE.md" ~/.claude/CLAUDE.md
   echo "Installed CLAUDE.md"
 else
-  echo "~/.claude/CLAUDE.md already exists - merge claude/CLAUDE.md manually if needed"
+  echo "~/.claude/CLAUDE.md already exists - merge claude/$lang/CLAUDE.md manually if needed"
 fi
 ```
 

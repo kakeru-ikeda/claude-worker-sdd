@@ -3,6 +3,8 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import type { Lang } from "./i18n.js";
+
 export function userConfigDir(
   env: NodeJS.ProcessEnv = process.env,
   platform: NodeJS.Platform = process.platform,
@@ -35,4 +37,14 @@ export function assetPath(...segs: string[]): string {
   return existsSync(packagedPath)
     ? packagedPath
     : join(packageRoot(), "..", ...segs);
+}
+
+export function localizedAssetPath(lang: Lang, ...segs: string[]): string {
+  if (segs.length === 0) return assetPath();
+
+  const localizedPath = assetPath(...segs.slice(0, -1), lang, segs.at(-1) as string);
+  if (existsSync(localizedPath)) return localizedPath;
+
+  const englishPath = assetPath(...segs.slice(0, -1), "en", segs.at(-1) as string);
+  return existsSync(englishPath) ? englishPath : assetPath(...segs);
 }
