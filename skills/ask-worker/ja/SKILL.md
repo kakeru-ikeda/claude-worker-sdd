@@ -24,7 +24,11 @@ Superpowers プランの一部ではない、スコープを限定した単発�
   `sdd/adapters/` から (`--engine`) 選択します。
 - プランタスクと同様に、**バックグラウンドで**ディスパッチします
   (Bash `run_in_background: true`)。
-- 完了後は同じ成果物 `status.yaml`、`report.yaml`、`diff.patch` を読みます。
+- **ディスパッチしたらそのターンを終了してユーザーに返します。** ジョブの終了時に自動的に
+  再度呼び出されます。`TaskOutput` のブロッキング呼び出し、`sleep` / `until` ループ、
+  完了待ちのための Monitor は使わないでください。
+- 完了通知を受け取ってから同じ成果物 `status.yaml`、`report.yaml`、`diff.patch` を
+  読みます。
 - ワーカーによるスコープ拡大や後続タスクのオーケストレーションを許可しないでください。
 
 ## コマンド

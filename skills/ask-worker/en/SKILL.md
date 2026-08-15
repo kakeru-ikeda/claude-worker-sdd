@@ -23,7 +23,11 @@ not part of a Superpowers plan.
 - Pick the agent role from `sdd/agents/` (`--agent`), the engine from `sdd/adapters/`
   (`--engine`).
 - Dispatch **in the background** (Bash `run_in_background: true`), same as plan tasks.
-- Read the same artifacts afterwards: `status.yaml`, `report.yaml`, `diff.patch`.
+- **Once dispatched, end the turn and return to the user.** You are re-invoked
+  automatically when the job exits. Never block on `TaskOutput`, never poll with `sleep` /
+  `until` loops, and do not arm a Monitor just to wait for completion.
+- Read the same artifacts once the completion notification arrives: `status.yaml`,
+  `report.yaml`, `diff.patch`.
 - Do not let the worker expand scope or orchestrate follow-up tasks.
 
 ## Command
