@@ -76,8 +76,9 @@ sdd-worker next docs/plans/<feature>.md --verify '<project test cmd>'   # persis
 #    FS/.git protection always stays on.
 sdd-worker next docs/plans/<feature>.md            # picks first non-complete task
 
-# 2. While it runs: do other work. Do NOT poll in a loop; the background job
-#    re-invokes you on exit. One tail of the stream is acceptable for a health check.
+# 2. End the turn and do other work. The background job re-invokes you on exit.
+#    Do NOT block on TaskOutput, poll in a sleep/until loop, or arm a Monitor to wait
+#    for completion. One tail of the stream is acceptable for a health check.
 
 # 3. On completion, read exactly these (in order, stop as soon as you can decide):
 #    - .sdd/plans/<slug>/tasks/task-N/status.yaml   (~15 lines: verdict + failure_reason)

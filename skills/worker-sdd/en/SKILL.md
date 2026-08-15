@@ -83,8 +83,8 @@ auto-migrates any legacy flat layout into `plans/<slug>/` on its next invocation
 
 The runner spawns the engine (e.g. `codex exec`) and waits for it internally — a single
 `codex exec` run can take many minutes. **Never run it in the foreground**, or the
-orchestrator stalls and other work cannot proceed. Run it as a background shell job and
-poll the task artifacts for completion — the same model the predecessor used.
+orchestrator stalls and other work cannot proceed. Run it as a background shell job — you
+are re-invoked automatically when the job exits, so there is nothing to wait on actively.
 
 Do not preflight the engine CLI (`which codex` etc.) — dispatch directly; a missing
 binary fails fast with a "binary not found" reason and a recovery hint.
@@ -108,11 +108,28 @@ from artifacts (paths relative to the repo root; `<plan>` = `plans/<plan-slug>/`
 - `.sdd/<plan>/tasks/task-N/report.yaml` — the worker's report (required output)
 - `.sdd/<plan>/tasks/task-N/attempts/<NNN-engine-model>/stdout.jsonl` — live engine stream (tail sparingly; can be huge)
 
-While the background job runs, the orchestrator is free to: answer the user, dispatch
-read-only agents (`explorer` / `thinker` / `reviewer`) in parallel, and tail
-`stdout.jsonl` to monitor. When the background job exits you are re-invoked
-automatically; otherwise poll `status.yaml` / `progress.yaml`. Then read `report.yaml`
-and the diff to review.
+### After dispatching (important)
+
+**Once dispatched, end the turn and return to the user.** You are re-invoked automatically
+when the background job exits; read the artifacts then.
+
+Ways of waiting that are forbidden:
+
+- Calling `TaskOutput` blocking (`block: true`) — it freezes the session.
+- Polling with `sleep`, `until` loops, or repeated "progress check" commands.
+- Arming a Monitor just to wait for completion. Monitor is for "notify me on every
+  occurrence"; "notify me once when it finishes" is what the background job already does.
+
+What you may do while the job runs: answer the user, dispatch read-only agents
+(`explorer` / `thinker` / `reviewer`) in parallel, and make progress on anything else.
+
+When the completion notification arrives, read `status.yaml` → `report.yaml` →
+`diff.patch` in that order and review.
+
+(Fallback: only if you suspect the job hung and no notification is coming, read
+`status.yaml` / `progress.yaml` once to check state. That is an anomaly path, not the
+normal way to wait. Tailing a filtered `stdout.jsonl` with Monitor is optional and only
+for following progress inside a genuinely long run.)
 
 **One executor at a time:** do not background a second `executor` dispatch against the same
 worktree while one is running (git conflicts). The runner enforces this with a per-plan
